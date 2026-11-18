@@ -25,6 +25,11 @@ const catalog = [
   { id: 'headunit', name: 'CarPlay / Android Auto', category: 'Tech', parts: 11490, labor: 2000, review: true, note: 'Harness, fascia and existing controls require inspection.' },
   { id: 'camera', name: 'Reverse camera', category: 'Tech', parts: 3500, labor: 1400, review: true, note: 'Head-unit and harness compatibility require inspection.' },
 ];
+const offers = [
+  { id: 'protect', title: 'Protect a new car', description: 'Front-end paint protection film and ceramic coating.', category: 'Protection', ids: ['ppf', 'ceramic'] },
+  { id: 'refresh', title: 'Refresh a pre-owned car', description: 'Deep-clean the cabin and refresh the exterior with ceramic coating.', category: 'Interior', ids: ['detail', 'ceramic'] },
+  { id: 'modernise', title: 'Modernise an older car', description: 'Add CarPlay or Android Auto and a reverse camera, subject to fitment review.', category: 'Tech', ids: ['headunit', 'camera'] },
+];
 const read = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 };
@@ -32,6 +37,7 @@ let jobs = read('motorform.jobs.v1', []);
 let paused = new Set(read('motorform.paused.v1', []));
 const selected = new Set();
 let category = 'Protection';
+let activeOffer;
 let finish = 0;
 let photo;
 let toastTimer;
@@ -72,7 +78,18 @@ function getQuote(delivery = false) {
   const tax = Math.round((subtotal + shipping) * 0.18);
   return { items, subtotal, shipping, tax, total: subtotal + shipping + tax };
 }
+function renderOffers() {
+  $('offers').innerHTML = offers.map((offer) => {
+    const items = catalog.filter((item) => offer.ids.includes(item.id));
+    const subtotal = items.reduce((sum, item) => sum + item.parts + item.labor, 0);
+    const unavailable = items.some((item) => item.blocked || paused.has(item.id) || ($('no-cut').checked && !item.noCut));
+    return `<button class="offer" data-offer="${offer.id}" aria-pressed="${activeOffer === offer.id}" ${unavailable ? 'disabled' : ''}><strong>${offer.title}</strong><small>${offer.description}</small><span>${unavailable ? 'Unavailable with current filters' : `Est. ${price(Math.round(subtotal * 1.18))} installed <b aria-hidden="true">→</b>`}</span></button>`;
+  }).join('');
+}
 function renderCatalog() {
+  const offer = offers.find((item) => item.id === activeOffer);
+  if (offer && (selected.size !== offer.ids.length || offer.ids.some((id) => !selected.has(id)))) activeOffer = undefined;
+  renderOffers();
   $('tabs').innerHTML = [...new Set(catalog.map((p) => p.category))].map((value) => `<button data-category="${value}" class="${value === category ? 'on' : ''}" aria-pressed="${value === category}">${value}</button>`).join('');
   const items = catalog.filter((item) => item.category === category && (!$('no-cut').checked || item.noCut));
   $('products').innerHTML = items.map((item) => {
@@ -94,7 +111,7 @@ function syncBooking() {
   $('booking-summary').textContent = `${$('preview-title').textContent} · ${price(quote.total)} estimated${delivery ? ` including ${price(quote.shipping)} delivery` : ''}.`;
 }
 function showPage(page) {
-  for (const id of ['studio', 'workshop', 'admin']) $(id).hidden = id !== page;
+  for (const id of ['studio', 'requests', 'workshop', 'admin']) $(id).hidden = id !== page;
   document.querySelectorAll('[data-page]').forEach((button) => {
     button.classList.toggle('on', button.dataset.page === page);
     if (button.dataset.page === page) button.setAttribute('aria-current', 'page');
@@ -104,6 +121,7 @@ function showPage(page) {
   renderAdmin();
 }
 function renderJobs() {
+  $('my-jobs').innerHTML = jobs.map((job) => `<article class="job"><div class="section-top"><strong>${esc(job.vehicle)}</strong><span class="badge">${esc(job.status)}</span></div><p>${job.items.map(esc).join(', ')} · ${price(job.total)}</p><p class="muted">${esc(job.id)} · ${esc(job.destination)}${job.date ? ' · ' + esc(job.date) : ''}</p></article>`).join('') || '<div class="panel"><h2>No requests yet</h2><p class="muted">Choose a package or an upgrade in the Studio to build your estimate.</p><button class="control" data-page="studio">Open Studio</button></div>';
   $('jobs').innerHTML = jobs.map((job) => `<article class="job"><div class="section-top"><strong>${esc(job.id)} · ${esc(job.vehicle)}</strong><span class="badge">${esc(job.status)}</span></div><p>${job.items.map(esc).join(', ')} · ${price(job.total)}</p><p class="muted">${esc(job.destination)}${job.date ? ' · ' + esc(job.date) : ''}</p>${job.status === 'Requested' || job.status === 'Needs review' ? `<button class="action" data-accept="${esc(job.id)}">${job.status === 'Needs review' ? 'Record demo review and accept' : 'Accept request'}</button>` : ''}${job.status === 'Accepted' ? `<form class="action" data-complete="${esc(job.id)}"><label><input type="checkbox" required> ${job.mode === 'delivery' ? 'Packing and item check done' : 'Fitment and handover checklist done'}</label><button class="action">${job.mode === 'delivery' ? 'Mark dispatched' : 'Mark completed'}</button></form>` : ''}</article>`).join('') || '<div class="panel"><h2>No requests yet</h2><p class="muted">Create a demo request in the Studio to see it here.</p></div>';
 }
 function renderAdmin() {
@@ -169,6 +187,17 @@ document.addEventListener('click', (event) => {
   if (!button) return;
   const data = button.dataset;
   if (data.page) showPage(data.page);
+  if (data.offer) {
+    const offer = offers.find((item) => item.id === data.offer);
+    if (!offer || button.disabled) return;
+    activeOffer = offer.id;
+    category = offer.category;
+    selected.clear();
+    offer.ids.forEach((id) => selected.add(id));
+    renderCatalog();
+    $('offers').querySelector('[data-offer="' + offer.id + '"]').focus();
+    notice(offer.title + ' added to your estimate.');
+  }
   if (data.finish !== undefined) {
     finish = Number(data.finish);
     renderPreview();
@@ -240,7 +269,7 @@ $('booking-form').addEventListener('submit', (event) => {
   $('booking').close();
   selected.clear();
   renderCatalog();
-  showPage('workshop');
+  showPage('requests');
   notice('Demo request saved · ' + job.id);
 });
 $('jobs').addEventListener('submit', (event) => {
