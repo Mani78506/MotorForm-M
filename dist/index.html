@@ -1,21 +1,52 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Configure, price and request car upgrades in Hyderabad."><title>Motorform — Car customization studio</title><link rel="stylesheet" href="./style.css"><script type="module" src="./app.js"></script></head>
-<body><header><div class="brand"><span class="mark">M</span> MOTORFORM<span class="dot">.</span></div><nav aria-label="Studio views"><button data-page="studio" class="on">Studio</button><button data-page="requests">My requests</button><button data-page="workshop">Workshop demo</button><button data-page="admin">Admin demo</button></nav><div class="location">◉ &nbsp; Hyderabad, IN</div></header>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Motorform helps car owners in Hyderabad preview upgrades and build an itemised estimate, from paint protection to CarPlay and reverse cameras.">
+<title>Motorform — Car upgrades in Hyderabad</title>
+<link rel="stylesheet" href="./landing.css">
+<link rel="preload" href="./car.webp" as="image">
+</head>
+<body>
+<header class="header">
+  <div class="shell nav">
+    <a class="logo" href="./" aria-label="Motorform home"><span>M</span> MOTORFORM<span class="period">.</span></a>
+    <nav aria-label="Main navigation"><a href="#offers">Upgrades</a><a href="#how">How it works</a><a href="#faq">FAQ</a></nav>
+    <a class="button compact" href="./studio.html">Open Studio <span aria-hidden="true">↗</span></a>
+  </div>
+</header>
 <main>
-<section id="studio">
-<div class="intro"><div><p class="kicker">CUSTOMIZATION STUDIO</p><h1>Make it <em>yours.</em></h1><p>Preview upgrades, build your quote, and plan an installation in Hyderabad.</p></div><span class="badge">◉ &nbsp; Pilot demo</span></div>
-<section class="offers" aria-label="Upgrade packages"><div class="section-top"><h2>What would you like to do?</h2></div><div id="offers" class="offer-grid"></div></section>
-<div class="layout"><div class="left">
-<section class="preview" aria-label="Vehicle preview"><img id="car-image" src="./car.webp" alt="Illustrative reference crossover"><div class="preview-top"><span id="preview-label">REFERENCE VEHICLE</span><label class="upload">↥ &nbsp; Upload photo<input id="upload" type="file" accept="image/jpeg,image/png,image/webp"></label></div><div class="preview-bottom"><div><strong id="preview-title">Tata Nexon</strong><small id="preview-note">Reference image · finish is illustrative</small></div><button id="reset-photo" hidden>Use reference</button></div></section>
-<section class="panel catalog"><div class="section-top"><div><p class="kicker">UPGRADE CATALOG</p><h2>Build your upgrade</h2></div><label class="toggle"><input id="no-cut" type="checkbox"> No factory wiring cuts</label></div>
-<div id="tabs" class="tabs" aria-label="Upgrade categories"></div><div id="products" class="products"></div></section>
-</div><aside class="right">
-<section class="panel vehicle"><p class="kicker">YOUR GARAGE</p><h2>Vehicle details</h2><div class="fields"><label>Make<select id="make"></select></label><label>Model<select id="model"></select></label><label>Model year<select id="year"></select></label><label>Variant<input id="variant" maxlength="45" placeholder="e.g. Creative+" required></label></div><div class="finish"><label for="finish-list">Preview finish</label><div id="finish-list" class="swatches"></div><small id="finish-name">Pearl white</small></div></section>
-<section class="panel quote"><p class="kicker">YOUR BUILD</p><h2>Quote summary</h2><div id="quote-items"></div><div class="total"><span>Estimate</span><strong id="total">₹0</strong></div><p id="quote-note" class="muted">Sample Hyderabad pricing. Workshop confirmation required.</p><button class="primary" id="book">Review my estimate <span>→</span></button></section>
-</aside></div></section>
-<section id="requests" hidden><div class="intro"><div><p class="kicker">YOUR GARAGE</p><h1>My requests<span class="dot">.</span></h1><p>Track estimates you’ve saved on this device.</p></div></div><div id="my-jobs" class="queue"></div></section>
-<section id="workshop" hidden><div class="intro"><div><p class="kicker">WORKSHOP</p><h1>Job queue<span class="dot">.</span></h1><p>Review requests, accept work, and record a handover checklist.</p></div><span class="badge">Local demo data</span></div><div id="jobs" class="queue"></div></section>
-<section id="admin" hidden><div class="intro"><div><p class="kicker">OPERATIONS</p><h1>Pilot overview<span class="dot">.</span></h1><p>Review booking activity and catalog controls.</p></div><span class="badge">Local demo data</span></div><div class="metrics" id="stats"></div><section class="panel"><h2>Catalog controls</h2><p class="muted">Pause an upgrade to prevent new requests in this browser.</p><div id="controls"></div></section></section>
-</main><footer><strong>MOTORFORM<span class="dot">.</span></strong><span>Hyderabad pilot · Demo requests stay in this browser</span></footer>
-<dialog id="booking"><form id="booking-form"><div class="section-top"><h2>Request an upgrade</h2><button type="button" id="close" aria-label="Close">×</button></div><p id="booking-summary" class="muted"></p><label>Fulfillment<select id="mode"><option value="install">Workshop installation</option><option value="delivery">Self-install delivery</option></select></label><div id="install-fields"><label>Demo workshop<select id="shop"><option>Studio A · Gachibowli</option><option>Studio B · Kondapur</option></select></label><label>Preferred date<input type="date" id="date" required></label></div><p class="muted">This saves a demo request. No payment is taken and no partner is contacted.</p><button type="submit" class="primary">Save demo request <span>→</span></button></form></dialog><div id="toast" role="status"></div>
-</body></html>
+  <section class="hero" aria-labelledby="headline">
+    <div class="shell hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> HYDERABAD PILOT</p>
+        <h1 id="headline">Make your car<br>feel like <em>yours.</em></h1>
+        <p>Protect a new car, refresh a pre-owned one, or bring an older car up to date. Preview the look and see an itemised estimate before deciding what to install.</p>
+        <div class="actions"><a class="button" href="./studio.html">Build my upgrade <span aria-hidden="true">↗</span></a><a class="text-link" href="#offers">Explore upgrades <span aria-hidden="true">↓</span></a></div>
+      </div>
+      <figure><img src="./car.webp" width="1536" height="1024" alt="Pearl-white crossover with a black roof in a dark studio"><figcaption>Illustrative vehicle preview</figcaption></figure>
+    </div>
+  </section>
+  <section class="offers shell" id="offers" aria-labelledby="offer-heading">
+    <div class="section-heading"><div><p class="eyebrow">UPGRADE PACKAGES</p><h2 id="offer-heading">Start with what your car needs.</h2></div><p>Choose a package, then adjust the upgrades in Studio to suit your car and budget.</p></div>
+    <div class="cards">
+      <article class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.5 7.1-8 9-4.5-1.9-8-4.5-8-9V6l8-3z"/><path d="m8.5 12 2.4 2.4 4.6-4.7"/></svg><h3>Protect a new car</h3><p>Keep your new car looking fresh with front-end paint protection film and ceramic coating.</p><a href="./studio.html?offer=protect">Explore protection <span aria-hidden="true">↗</span></a></article>
+      <article class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 11a7 7 0 1 1 1.8 5.7M5 5v6h6"/><path d="M12 8v4l2.5 1.5"/></svg><h3>Refresh a pre-owned car</h3><p>Make your used car feel like yours with a cabin deep clean and an exterior finish refresh.</p><a href="./studio.html?offer=refresh">Explore refresh <span aria-hidden="true">↗</span></a></article>
+      <article class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="13" rx="2"/><path d="M8 21h8m-5-12 4 2.5-4 2.5z"/></svg><h3>Modernise an older car</h3><p>Add CarPlay or Android Auto and a reverse camera, subject to a vehicle-specific fitment check.</p><a href="./studio.html?offer=modernise">Explore modernisation <span aria-hidden="true">↗</span></a></article>
+    </div>
+  </section>
+  <section class="how" id="how" aria-labelledby="how-heading"><div class="shell">
+    <div class="section-heading"><div><p class="eyebrow">HOW IT WORKS</p><h2 id="how-heading">From idea to installation.</h2></div><p>Our aim is to make it easy to see the result, understand the price, and get the work done locally.</p></div>
+    <ol class="steps"><li><h3>Start with your car</h3><p>Choose the make, model, year and variant. Upload a photo to try finishes on your own car.</p></li><li><h3>Build your estimate</h3><p>Explore upgrades and see parts, labour and estimated taxes. Items that need inspection are flagged in Studio.</p></li><li><h3>Plan the installation</h3><p>Try the demo request flow today. Live bookings with local workshops are planned for the Hyderabad pilot.</p></li></ol>
+  </div></section>
+  <section class="shell faq" id="faq" aria-labelledby="faq-heading"><div><p class="eyebrow">BEFORE YOU START</p><h2 id="faq-heading">Good to know.</h2></div><div>
+    <details><summary>Will the parts fit my exact variant?</summary><p>Studio collects your variant and flags upgrades that need inspection. Exact part compatibility needs to be confirmed before any installation.</p></details>
+    <details><summary>Can I choose upgrades without cutting factory wiring?</summary><p>Use the no-factory-wiring-cuts filter in Studio. Ask your manufacturer or authorised dealer about warranty coverage for the exact accessory and installation method.</p></details>
+    <details><summary>Can I book a real installation today?</summary><p>The current Studio is a public demo. Estimates are illustrative, and requests are saved in your browser. Live workshop scheduling and payments are planned.</p></details>
+  </div></section>
+  <section class="shell closing"><div><h2>See what your car could become.</h2><a class="button" href="./studio.html">Open Motorform Studio <span aria-hidden="true">↗</span></a></div></section>
+</main>
+<footer><div class="shell"><a class="logo" href="./">MOTORFORM<span class="period">.</span></a><span>Hyderabad, India</span></div></footer>
+</body>
+</html>

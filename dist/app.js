@@ -281,3 +281,7 @@ updateVehicle();
 renderPreview();
 renderCatalog();
 showPage('studio');
+
+const requestedOffer = new URLSearchParams(window.location.search).get('offer');
+const starterOffer = offers.find((offer) => offer.id === requestedOffer);
+if (starterOffer) $('offers').querySelector('[data-offer="' + starterOffer.id + '"]').click();
