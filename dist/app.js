@@ -282,6 +282,16 @@ renderPreview();
 renderCatalog();
 showPage('studio');
 
-const requestedOffer = new URLSearchParams(window.location.search).get('offer');
+const studioParams = new URLSearchParams(window.location.search);
+const requestedMake = studioParams.get('make');
+const requestedModel = studioParams.get('model');
+if (Object.hasOwn(makes, requestedMake) && makes[requestedMake].includes(requestedModel)) {
+  $('make').value = requestedMake;
+  options($('model'), makes[requestedMake]);
+  $('model').value = requestedModel;
+  $('variant').value = (studioParams.get('variant') ?? '').slice(0, 45);
+  updateVehicle();
+}
+const requestedOffer = studioParams.get('offer');
 const starterOffer = offers.find((offer) => offer.id === requestedOffer);
 if (starterOffer) $('offers').querySelector('[data-offer="' + starterOffer.id + '"]').click();

@@ -13,6 +13,7 @@ const features = {
   camera: { name:'Reverse camera', cost:5800 },
   automatic: { name:'Automatic transmission' },
 };
+const defaultFilters = { 'car-search':'', budget:'1500000', 'car-use':'', 'must-have':'', sort:'price' };
 const $ = id => document.getElementById(id);
 const money = new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 });
 const format = value => money.format(value);
@@ -29,11 +30,14 @@ function tell(message) {
 }
 
 function updateCards() {
+  const query = $('car-search').value.trim().toLowerCase().split(/\s+/);
   const limit = Number($('budget').value);
+  $('reset-filters').hidden = Object.entries(defaultFilters).every(([id,value]) => $(id).value === value);
   const use = $('car-use').value;
   const required = $('must-have').value;
   const requiredCost = car => required && !car.factory.includes(required) && car.options.includes(required) ? features[required].cost : 0;
   const candidates = cars.filter(car => (!savedOnly || saved.has(car.id)) &&
+    query.every(term => `${car.model} ${car.trim} ${car.body}`.toLowerCase().includes(term)) &&
     (savedOnly || ((!use || car.uses.includes(use)) &&
     (!required || car.factory.includes(required) || car.options.includes(required)) &&
     onRoad(car) + requiredCost(car) <= limit)));
@@ -46,8 +50,14 @@ function updateCards() {
     <p class="eyebrow">${car.body}</p><div><h3>${car.model}</h3><p>${car.trim}</p></div>
     <div><p class="price">${format(onRoad(car) + requiredCost(car))}</p><small>Estimated on-road${requiredCost(car) ? ' + selected feature' : ''}</small></div>
     <div class="tags">${car.factory.map(key => `<span>${features[key].name} · factory</span>`).join('')}${requiredCost(car) ? `<span>${features[required].name} · upgrade</span>` : ''}</div>
-    <div class="card-actions"><button class="subtle" data-compare="${car.id}" aria-pressed="${compared.has(car.id)}">${compared.has(car.id) ? '✓ Compare' : 'Compare'}</button><button class="subtle" data-save="${car.id}" aria-pressed="${saved.has(car.id)}">${saved.has(car.id) ? '✓ Saved' : 'Save'}</button><button class="subtle" data-dealer="${car.id}">Dealer enquiry</button></div>
-  </article>`).join('') || `<p class="empty">${savedOnly ? 'Save a variant to start your shortlist.' : 'Try a higher budget or change a filter.'}</p>`;
+    <div class="card-actions"><button class="subtle" data-compare="${car.id}" aria-pressed="${compared.has(car.id)}">${compared.has(car.id) ? '✓ Compare' : 'Compare'}</button><button class="subtle" data-save="${car.id}" aria-pressed="${saved.has(car.id)}">${saved.has(car.id) ? '✓ Saved' : 'Save'}</button><button class="subtle" data-dealer="${car.id}">Dealer enquiry</button><a class="configure" href="${studioLink(car)}">Preview upgrades ↗</a></div>
+  </article>`).join('') || `<p class="empty">${savedOnly && !saved.size ? 'Save a variant to start your shortlist.' : 'No matching variants. Try another search or reset the filters.'}</p>`;
+}
+
+function studioLink(car) {
+  const make = car.model.startsWith('Maruti Suzuki ') ? 'Maruti Suzuki' : car.model.split(' ')[0];
+  const model = car.model.slice(make.length + 1);
+  return './studio.html?' + new URLSearchParams({ make, model, variant: car.trim });
 }
 
 function upgradeTotal(id) {
@@ -79,6 +89,12 @@ function prepareEnquiry(id) {
   $('dealer-dialog').showModal();
 }
 
+$('car-search').addEventListener('input', updateCards);
+$('reset-filters').addEventListener('click', () => {
+  for (const [id,value] of Object.entries(defaultFilters)) $(id).value = value;
+  updateCards();
+  $('car-search').focus();
+});
 for (const id of ['budget','car-use','must-have','sort']) $(id).addEventListener('change', updateCards);
 $('shortlist-toggle').addEventListener('click', () => { savedOnly = !savedOnly; updateCards(); });
 $('clear-compare').addEventListener('click', () => {
