@@ -15,8 +15,9 @@
   </section>
   <section data-screen="matches" hidden><h1>Matches for you</h1><div class="screen-tools"><a href="#find" class="subtle">Edit preferences</a><button class="subtle" type="button" id="browse-all" hidden>Browse all</button></div>
     <div class="result-bar"><p id="result-count" role="status"></p>      <label>Sort by<select id="sort"><option value="price">Lowest estimated cost</option><option value="factory">Most factory features</option></select></label></div><div id="car-results" class="app-results"></div>
-    <a class="button app-primary" id="compare-jump" href="#compare" hidden>Compare selected</a>
+    <a class="button app-primary compare-dock" id="compare-jump" href="#compare" hidden>Compare selected</a>
   </section>
+  <section data-screen="detail" hidden><a class="detail-back" id="detail-back" href="#matches">← Back to matches</a><h1 id="detail-heading">Car details</h1><div id="detail-content"></div></section>
   <section data-screen="compare" hidden><h1>Compare variants</h1><p id="compare-empty" class="empty">Select variants on the Matches or Saved screen to compare them.</p><div class="compare-panel" id="compare-panel" hidden><div class="result-bar"><small>Estimated prices · Fitment checks required</small><button type="button" class="subtle" id="clear-compare">Clear</button></div><div class="table-wrap" id="compare-results"></div></div></section>
   <section data-screen="saved" hidden><h1>Saved cars</h1><div id="saved-results" class="app-results"></div></section>
   <section data-screen="requests" hidden><h1>My enquiries</h1><button class="subtle" id="my-enquiries" type="button">Refresh</button><div id="history-results"></div></section>
