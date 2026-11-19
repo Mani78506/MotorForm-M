@@ -157,9 +157,10 @@ function MotorForm() {
   const load=useCallback(async()=>{
     setError('');
     try {
-      const [data,list]=await Promise.all([request<Catalog>('catalog'),request<string[]>('shortlist')]);
+      const data=await request<Catalog>('catalog');
       setCatalog(data);
-      setSaved(list);
+      try { setSaved(await request<string[]>('shortlist')); }
+      catch { setNotice('Saved cars are unavailable. Reopen the app to retry.'); }
     } catch { setError('Could not load the catalog. Check your connection and try again.'); }
   },[]);
   useEffect(()=>{void load();},[load]);

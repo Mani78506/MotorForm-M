@@ -30,13 +30,15 @@ function getSession() {
 }
 
 export async function request<T>(path: string, method = 'GET', payload?: unknown): Promise<T> {
-  const id = await getSession();
+  const id = method === 'GET' && (path === 'catalog' || path.startsWith('matches?'))
+    ? undefined
+    : await getSession();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await fetch(base + '/api/' + path, {
       method,
-      headers: { 'X-MotorForm-Session': id, Accept: 'application/json', ...(payload ? {'Content-Type':'application/json'} : {}) },
+      headers: { Accept: 'application/json', ...(id ? {'X-MotorForm-Session': id} : {}), ...(payload ? {'Content-Type':'application/json'} : {}) },
       body: payload === undefined ? undefined : JSON.stringify(payload),
       signal: controller.signal,
       credentials: 'omit',

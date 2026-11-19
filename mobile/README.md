@@ -1,14 +1,27 @@
-# MotorForm native app
+# Run MotorForm on your phone
 
-Android and iOS app built with Expo and React Native. The app uses the MotorForm catalog and enquiry API. Shortlists and enquiries follow an installation-specific identity held in Expo SecureStore.
+MotorForm is a native Expo SDK 54 app that connects to the deployed Hyderabad catalog API.
+
+1. On your computer, open a terminal in the repository's `mobile` directory. Use Node.js 22 LTS.
+2. Run the commands below and leave the terminal open.
+3. Connect the phone and computer to the same Wi-Fi network. Use an Expo Go build compatible with SDK 54 and scan the terminal's QR code.
 
 ```sh
 npm ci
-npm run typecheck
-npm run bundle
-npm start
+npx expo start --lan
 ```
 
-Run Metro from this directory and open the project in a compatible Expo Go or development build on a phone. An Android internal distribution APK can be built by a signed-in Expo project owner with `npx eas-cli build --platform android --profile preview`. The EAS project link and distribution credentials are configured in that owner's Expo account.
+[Expo Go SDK 54 for Android](https://expo.dev/go?device=true&platform=android&sdkVersion=54)
 
-The catalog currently contains sample estimates. The car photos are model references and may depict a different trim or colour.
+If the phone cannot reach the computer over Wi-Fi, try `npx expo start --tunnel` from the same directory. A tunnel requires the Expo CLI's ngrok dependency and a reachable ngrok service.
+
+## Checks and builds
+
+```sh
+npm run typecheck
+npm run bundle
+```
+
+To create an internal Android APK through Expo, link the project to your Expo account and run `npx eas-cli build --platform android --profile preview`. The selected Expo account manages the build credentials.
+
+The app uses a per-installation identity kept in SecureStore for saved cars and enquiries. Browsing and recommendations are public. Prices include sourced estimates where available. Equipment and upgrade fitment remain illustrative.
