@@ -4,5 +4,6 @@ for (const model of ['swift','baleno','nexon','creta']) types['cars/'+model+'.we
 const assets = Object.fromEntries(await Promise.all(Object.entries(types).map(async ([path,type]) => [path,{type,body:(await readFile('public/'+path)).toString('base64')}])));
 const source = await readFile('worker/index.mjs','utf8');
 const seed = JSON.parse(await readFile("worker/seed.json", "utf8"));
+const priceSnapshot = JSON.parse(await readFile('worker/hyderabad-prices.json', 'utf8'));
 await mkdir('dist/server',{recursive:true});
-await writeFile('dist/server/index.js', 'const assets = '+JSON.stringify(assets)+';\n'+ 'const seed = '+JSON.stringify(seed)+';\n'+source);
+await writeFile('dist/server/index.js', 'const assets = '+JSON.stringify(assets)+';\n'+ 'const seed = '+JSON.stringify(seed)+';\n'+ 'const priceSnapshot = '+JSON.stringify(priceSnapshot)+';\n'+source);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StatusBar, Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NavigationContainer, NavigatorScreenParams, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -62,7 +62,7 @@ function FindScreen({catalog,busy,error,onFind}:{catalog:Catalog;busy:boolean;er
     <TextInput accessibilityLabel="Search by model or trim" placeholder="Search by model or trim (optional)" placeholderTextColor={muted} autoCorrect={false} maxLength={70} value={query} onChangeText={setQuery} style={s.input}/>
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <Button label={busy?'Finding matches…':'See my matches'} icon="arrow-forward" disabled={busy} onPress={()=>onFind(budget,use,features,query)}/>
-    {catalog.illustrative&&<Text style={s.small}>Sample catalog and estimates</Text>}
+    {catalog.illustrative&&<Text style={s.small}>Sourced prices where shown. Equipment and upgrade fitment are illustrative.</Text>}
   </Frame>;
 }
 function CarCard({car,total,features,matched,saved,selected,onSave,onCompare,onOpen}:{car:Car;total:number;features:Catalog['features'];matched:Match|undefined;saved:boolean;selected:boolean;onSave:()=>void;onCompare:()=>void;onOpen:()=>void}) {
@@ -81,7 +81,8 @@ function Details({car,catalog,onEnquire,selected,saved,onSave,onCompare}:{car:Ca
     <View style={s.split}><Text>Vehicle price</Text><Text style={s.bold}>{rupees(car.base)}</Text></View>
     <View style={s.split}><Text>Registration and insurance est.</Text><Text style={s.bold}>{rupees(car.costs)}</Text></View>
     <View style={s.split}><Text style={s.heading}>On-road estimate</Text><Text style={s.price}>{rupees(onRoad(car))}</Text></View>
-    <Text style={s.small}>{car.source ? car.source+' · '+(car.priceDate ?? '') : 'Sample price and equipment'}</Text>
+    <Text style={s.small}>{car.source ? car.source+' · Checked '+(car.priceDate ?? '') : 'Sample price and equipment'}</Text>
+    {car.priceUrl?.startsWith('https://www.cardekho.com/')&&<Text accessibilityRole="link" style={s.sourceLink} onPress={()=>{void Linking.openURL(car.priceUrl!).catch(()=>{});}}>View price source ↗</Text>}
   </View></View>
   <Text style={s.heading}>Equipment and upgrades</Text>
   <View style={s.panel}>{Object.entries(catalog.features).map(([key,feature])=><View key={key} style={s.featureLine}><Text style={s.flex}>{feature.name}</Text><Text style={car.factory.includes(key)?s.factory:s.tag}>{car.factory.includes(key)?'✓ Factory':car.options.includes(key)?'Check fitment · '+rupees(feature.cost ?? 0):'Unconfirmed'}</Text></View>)}</View>
@@ -212,7 +213,7 @@ function MotorForm() {
       <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onFind={(budget,use,features,query)=>void find(budget,use,features,query,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
       <Tab.Screen name="Matches" options={{title:'Matches for you',tabBarLabel:'Matches'}}>{({navigation})=><Frame>
         {!!notice&&<Text accessibilityRole="alert" style={s.error}>{notice}</Text>}
-        {matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · Hyderabad{catalog!.illustrative?' · Sample estimates':''}</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
+        {matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · Hyderabad{catalog!.illustrative?' · Estimates':''}</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
         {list(go,(matches??[]).flatMap(match=>cars.filter(car=>car.id===match.id)),true)}
         {compare.length>0&&<Button label={'Compare ('+compare.length+')'} icon="swap-horizontal-outline" onPress={()=>navigation.navigate('Compare')}/>}
         <Button label="Edit preferences" secondary onPress={()=>navigation.navigate('Find')}/>
@@ -262,6 +263,7 @@ const s=StyleSheet.create({
   heart:{position:'absolute',right:10,top:10,width:43,height:43,borderRadius:22,backgroundColor:'#FFF',justifyContent:'center',alignItems:'center'},
   tag:{backgroundColor:'#E8F0FA',color:'#294D76',fontWeight:'600',fontSize:11,borderRadius:12,paddingHorizontal:7,paddingVertical:4,alignSelf:'flex-start'},
   factory:{backgroundColor:'#DDF4E4',color:'#1D5530',fontWeight:'700',fontSize:11,borderRadius:12,paddingHorizontal:7,paddingVertical:4,alignSelf:'flex-start'},
+  sourceLink:{color:blue,fontSize:13,fontWeight:'700'},
   error:{color:'#9B2637',fontWeight:'700'},empty:{alignItems:'center',gap:8,padding:23,borderRadius:14,backgroundColor:'#FFF',borderWidth:1,borderColor:border},
   featureLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:border,paddingBottom:8},
   compareTable:{padding:11,backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:12,gap:11},compareRow:{flexDirection:'row',gap:9},

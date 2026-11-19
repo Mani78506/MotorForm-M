@@ -7,11 +7,25 @@ const nativeSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}
 const purposes = ['quote','test-drive'];
 const next = {received:['reviewed','closed'],reviewed:['forwarded','closed'],forwarded:['replied','closed'],replied:['closed'],closed:[]};
 
+function withHyderabadEstimates(data) {
+  if (!data.illustrative) return data;
+  return {...data,cars:data.cars.map(car=>{
+    const price = priceSnapshot.models[car.id];
+    const original = seed.cars.find(item=>item.id===car.id);
+    if (!price || !original || car.source || !['model','trim','fuel','gearbox','base','costs'].every(key=>car[key]===original[key])) return car;
+    const [path,base,registration,insurance]=price;
+    return {...car,base,costs:registration+insurance,source:priceSnapshot.source,
+      priceDate:priceSnapshot.checked,priceUrl:'https://www.cardekho.com/'+path+'/price-in-hyderabad'};
+  })};
+}
+
 async function catalog(db) {
-  const row = await db.prepare('SELECT payload FROM catalog WHERE id = 1').first();
-  if (row) return JSON.parse(row.payload);
-  await db.prepare('INSERT OR IGNORE INTO catalog (id,payload) VALUES (1,?)').bind(JSON.stringify({...seed, illustrative:true})).run();
-  return JSON.parse((await db.prepare('SELECT payload FROM catalog WHERE id = 1').first()).payload);
+  let row = await db.prepare('SELECT payload FROM catalog WHERE id = 1').first();
+  if (!row) {
+    await db.prepare('INSERT OR IGNORE INTO catalog (id,payload) VALUES (1,?)').bind(JSON.stringify({...seed, illustrative:true})).run();
+    row = await db.prepare('SELECT payload FROM catalog WHERE id = 1').first();
+  }
+  return withHyderabadEstimates(JSON.parse(row.payload));
 }
 
 function validCatalog(data) {

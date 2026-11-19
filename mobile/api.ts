@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 export type Car = {
   id: string; model: string; trim: string; body: string; fuel: string; gearbox: string;
   base: number; costs: number; uses: string[]; factory: string[]; options: string[];
-  year?: number; source?: string; priceDate?: string;
+  year?: number; source?: string; priceDate?: string; priceUrl?: string;
 };
 export type Feature = { name: string; cost?: number };
 export type Catalog = { cars: Car[]; features: Record<string, Feature>; illustrative: boolean };

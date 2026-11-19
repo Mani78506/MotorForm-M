@@ -1,0 +1,12 @@
+{
+  "checked": "2026-11-19",
+  "source": "CarDekho Hyderabad estimate",
+  "models": {
+    "swift-vxi": ["maruti/swift", 667900, 96706, 37335],
+    "swift-zxi": ["maruti/swift", 873900, 125546, 44916],
+    "baleno-delta": ["maruti/baleno", 699900, 101186, 38513],
+    "baleno-zeta": ["maruti/baleno", 849900, 122186, 44033],
+    "nexon-smart": ["tata/nexon", 821990, 118278, 43006],
+    "creta-e": ["hyundai/creta", 1090700, 188619, 52895]
+  }
+}
