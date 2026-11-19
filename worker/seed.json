@@ -1,0 +1,174 @@
+{
+  "cars": [
+    {
+      "id": "swift-vxi",
+      "model": "Maruti Suzuki Swift",
+      "trim": "VXi MT",
+      "body": "Hatchback",
+      "uses": [
+        "city"
+      ],
+      "base": 750000,
+      "costs": 102000,
+      "factory": [],
+      "options": [
+        "phone",
+        "camera"
+      ],
+      "fuel": "Petrol",
+      "gearbox": "Manual"
+    },
+    {
+      "id": "swift-zxi",
+      "model": "Maruti Suzuki Swift",
+      "trim": "ZXi+ AMT",
+      "body": "Hatchback",
+      "uses": [
+        "city"
+      ],
+      "base": 950000,
+      "costs": 130000,
+      "factory": [
+        "phone",
+        "camera",
+        "automatic"
+      ],
+      "options": [],
+      "fuel": "Petrol",
+      "gearbox": "Automatic"
+    },
+    {
+      "id": "baleno-delta",
+      "model": "Maruti Suzuki Baleno",
+      "trim": "Delta MT",
+      "body": "Hatchback",
+      "uses": [
+        "city",
+        "family"
+      ],
+      "base": 780000,
+      "costs": 107000,
+      "factory": [
+        "phone"
+      ],
+      "options": [
+        "camera"
+      ],
+      "fuel": "Petrol",
+      "gearbox": "Manual"
+    },
+    {
+      "id": "baleno-zeta",
+      "model": "Maruti Suzuki Baleno",
+      "trim": "Zeta AMT",
+      "body": "Hatchback",
+      "uses": [
+        "city",
+        "family"
+      ],
+      "base": 925000,
+      "costs": 126000,
+      "factory": [
+        "phone",
+        "camera",
+        "automatic"
+      ],
+      "options": [],
+      "fuel": "Petrol",
+      "gearbox": "Automatic"
+    },
+    {
+      "id": "nexon-smart",
+      "model": "Tata Nexon",
+      "trim": "Smart+ MT",
+      "body": "Compact SUV",
+      "uses": [
+        "city",
+        "family",
+        "highway"
+      ],
+      "base": 900000,
+      "costs": 125000,
+      "factory": [],
+      "options": [
+        "phone",
+        "camera"
+      ],
+      "fuel": "Petrol",
+      "gearbox": "Manual"
+    },
+    {
+      "id": "nexon-creative",
+      "model": "Tata Nexon",
+      "trim": "Creative+ AMT",
+      "body": "Compact SUV",
+      "uses": [
+        "city",
+        "family",
+        "highway"
+      ],
+      "base": 1160000,
+      "costs": 180000,
+      "factory": [
+        "phone",
+        "camera",
+        "automatic"
+      ],
+      "options": [],
+      "fuel": "Petrol",
+      "gearbox": "Automatic"
+    },
+    {
+      "id": "creta-e",
+      "model": "Hyundai Creta",
+      "trim": "E MT",
+      "body": "SUV",
+      "uses": [
+        "family",
+        "highway"
+      ],
+      "base": 1110000,
+      "costs": 185000,
+      "factory": [],
+      "options": [
+        "phone",
+        "camera"
+      ],
+      "fuel": "Petrol",
+      "gearbox": "Manual"
+    },
+    {
+      "id": "creta-sx",
+      "model": "Hyundai Creta",
+      "trim": "SX Tech IVT",
+      "body": "SUV",
+      "uses": [
+        "family",
+        "highway"
+      ],
+      "base": 1700000,
+      "costs": 266000,
+      "factory": [
+        "phone",
+        "camera",
+        "automatic"
+      ],
+      "options": [],
+      "fuel": "Petrol",
+      "gearbox": "Automatic"
+    }
+  ],
+  "features": {
+    "phone": {
+      "name": "CarPlay / Android Auto",
+      "cost": 16000
+    },
+    "camera": {
+      "name": "Reverse camera",
+      "cost": 5800
+    },
+    "automatic": {
+      "name": "Automatic transmission"
+    }
+  }
+}

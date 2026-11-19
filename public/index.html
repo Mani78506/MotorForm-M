@@ -29,20 +29,30 @@
     </div>
   </section>
   <section class="shell finder" id="finder" aria-labelledby="finder-heading">
-    <div class="section-heading"><div><p class="eyebrow">NEW-CAR FINDER</p><h2 id="finder-heading">What fits your budget?</h2></div><p>Explore a sample Hyderabad catalog. Prices, specifications and upgrade fitment are illustrative. Confirm them with a dealer before purchase.</p></div>
+    <div class="section-heading"><div><p class="eyebrow">NEW-CAR FINDER</p><h2 id="finder-heading">What fits your budget?</h2></div><p>Hyderabad · <span id="catalog-label">Loading catalog</span></p></div>
     <div class="filterbar">
       <label>Search cars<input type="search" id="car-search" placeholder="Model or variant"></label>
       <label>Maximum budget<select id="budget"><option value="1000000">₹10 lakh</option><option value="1500000" selected>₹15 lakh</option><option value="2000000">₹20 lakh</option><option value="99999999">Any budget</option></select></label>
-      <label>Primary use<select id="car-use"><option value="">Any use</option><option value="city">City commute</option><option value="family">Family trips</option><option value="highway">Highway driving</option></select></label>
-      <label>Must-have feature<select id="must-have"><option value="">Any features</option><option value="phone">CarPlay / Android Auto</option><option value="camera">Reverse camera</option><option value="automatic">Automatic transmission</option></select></label>
+      <label class="visually-hidden">Primary use<select id="car-use"><option value="">Any use</option><option value="city">City commute</option><option value="family">Family trips</option><option value="highway">Highway driving</option></select></label>
       <label>Sort by<select id="sort"><option value="price">Lowest estimated cost</option><option value="factory">Most factory features</option></select></label>
     </div>
-    <div class="result-bar"><p id="result-count" role="status"></p><div class="card-actions"><button type="button" class="subtle" id="reset-filters" hidden>Reset filters</button><a class="subtle" id="compare-jump" href="#compare-panel" hidden>View comparison</a><button type="button" class="subtle" id="shortlist-toggle" aria-pressed="false">Shortlist (0)</button></div></div>
+    <div class="preferences">
+      <fieldset><legend>How do you drive?</legend><div class="card-actions" id="use-tiles"><button class="subtle" type="button" data-use="" aria-pressed="true">Any use</button><button class="subtle" type="button" data-use="city">City</button><button class="subtle" type="button" data-use="family">Family</button><button class="subtle" type="button" data-use="highway">Highway</button></div></fieldset>
+      <fieldset><legend>Must-have features</legend><div class="card-actions" id="feature-tiles"></div></fieldset>
+      <button class="button" type="button" id="recommend">See best matches →</button>
+      <button class="subtle" type="button" id="browse-all" hidden>Browse all</button>
+    </div>
+    <div class="result-bar"><p id="result-count" role="status"></p><div class="card-actions"><button type="button" class="subtle" id="my-enquiries">My enquiries</button><button type="button" class="subtle" id="reset-filters" hidden>Reset filters</button><a class="subtle" id="compare-jump" href="#compare-panel" hidden>View comparison</a><button type="button" class="subtle" id="shortlist-toggle" aria-pressed="false">Shortlist (0)</button></div></div>
     <div class="compare-panel" id="compare-panel" hidden><div class="result-bar"><div><h3>Compare variants</h3><p>Upgrade estimates are optional and require fitment confirmation.</p></div><button type="button" class="subtle" id="clear-compare">Clear comparison</button></div><div class="table-wrap" id="compare-results"></div></div>
     <div id="car-results" class="cards"></div>
     <p id="finder-status" class="visually-hidden" role="status"></p>
   </section>
-  <dialog id="dealer-dialog"><form method="dialog"><div class="result-bar"><h3>Prepare a dealer enquiry</h3><button class="subtle" aria-label="Close">×</button></div></form><p>Copy or download this enquiry to send to a dealer. It is prepared on this device.</p><label for="enquiry">Enquiry preview</label><textarea id="enquiry" readonly rows="8"></textarea><div class="dealer-actions"><button type="button" id="copy-enquiry" class="button">Copy enquiry</button><button type="button" id="download-enquiry" class="subtle">Download</button></div><p id="dealer-status" role="status"></p></dialog>
+  <dialog id="dealer-dialog"><form method="dialog"><div class="result-bar"><h3>Request a quote or test drive</h3><button class="subtle" aria-label="Close">×</button></div></form>
+    <form id="dealer-submit"><strong id="enquiry-title"></strong><label>Request type<select id="enquiry-purpose"><option value="quote">On-road quote</option><option value="test-drive">Test drive</option></select></label>
+    <label>Email<input id="enquiry-email" type="email" maxlength="254" autocomplete="email" required></label><p>MotorForm receives your enquiry and may contact you about it. A dealer booking is confirmed separately.</p>
+    <div class="dealer-actions"><button type="submit" class="button">Send to MotorForm</button></div></form><p id="dealer-status" role="status"></p>
+  </dialog>
+  <dialog id="history-dialog"><form method="dialog"><div class="result-bar"><h3>My enquiries</h3><button class="subtle" aria-label="Close">×</button></div></form><div id="history-results"></div></dialog>
   <section class="offers shell" id="offers" aria-labelledby="offer-heading">
     <div class="section-heading"><div><p class="eyebrow">FOR CAR OWNERS</p><h2 id="offer-heading">Start with what your car needs.</h2></div><p>Choose a package, then adjust the upgrades in Studio to suit your car and budget.</p></div>
     <div class="cards">
@@ -53,7 +63,7 @@
   </section>
   <section class="how" id="how" aria-labelledby="how-heading"><div class="shell">
     <div class="section-heading"><div><p class="eyebrow">HOW IT WORKS</p><h2 id="how-heading">From shortlist to showroom.</h2></div><p>Decide which variant and upgrades are worth paying for before you visit the showroom.</p></div>
-    <ol class="steps"><li><h3>Set your priorities</h3><p>Filter by budget, how you drive, and the features you need. Save variants to your shortlist.</p></li><li><h3>Compare the total cost</h3><p>Compare factory equipment with the estimated cost of adding the same features later.</p></li><li><h3>Prepare for the dealer</h3><p>Take a comparison or enquiry to your dealer and confirm the on-road quote, availability and test-drive options.</p></li></ol>
+    <ol class="steps"><li><h3>Set your priorities</h3><p>Filter by budget, how you drive, and the features you need. Save variants to your shortlist.</p></li><li><h3>Compare the total cost</h3><p>Compare factory equipment with the estimated cost of adding the same features later.</p></li><li><h3>Prepare for the dealer</h3><p>Submit a quote or test-drive enquiry and track its status with MotorForm.</p></li></ol>
   </div></section>
   <section class="shell faq" id="faq" aria-labelledby="faq-heading"><div><p class="eyebrow">BEFORE YOU START</p><h2 id="faq-heading">Good to know.</h2></div><div>
     <details><summary>Will the parts fit my exact variant?</summary><p>Studio collects your variant and flags upgrades that need inspection. Exact part compatibility needs to be confirmed before any installation.</p></details>
