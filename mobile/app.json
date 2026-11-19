@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "MotorForm",
+    "slug": "motorform",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "icon": "./assets/app-icon-512.png",
+    "userInterfaceStyle": "light",
+    "ios": { "bundleIdentifier": "in.motorform.app" },
+    "android": {
+      "package": "in.motorform.app",
+      "adaptiveIcon": { "foregroundImage": "./assets/app-icon-512.png", "backgroundColor": "#111e35" }
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}

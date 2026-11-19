@@ -3,6 +3,7 @@ const validId = value => typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/.t
 const clean = (value, limit = 90) => typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= limit && !/[&<>"'\x00-\x1f]/.test(value);
 const amount = value => Number.isSafeInteger(value) && value >= 0 && value <= 100_000_000;
 const uuid = /^[0-9a-f-]{36}$/;
+const nativeSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const purposes = ['quote','test-drive'];
 const next = {received:['reviewed','closed'],reviewed:['forwarded','closed'],forwarded:['replied','closed'],replied:['closed'],closed:[]};
 
@@ -61,12 +62,12 @@ function matchCars(data, params) {
   }).sort((a,b) => b.factoryCount-a.factoryCount || a.total-b.total).slice(0,3);
 }
 
-async function api(request, env, url, visitor) {
+async function api(request, env, url, visitor, native) {
   const db = env.DB;
   if (!db) return json({error:'Database is unavailable.'},503);
   const {pathname,searchParams} = url;
   const method = request.method;
-  if (!['GET','HEAD'].includes(method) && request.headers.get('origin') !== url.origin) return json({error:'Invalid origin.'},403);
+  if (!['GET','HEAD'].includes(method) && request.headers.get('origin') !== url.origin && !native) return json({error:'Invalid origin.'},403);
   if (pathname.startsWith('/api/operator/')) {
     if (!env.MOTORFORM_OPERATOR_KEY || request.headers.get('authorization') !== 'Bearer '+env.MOTORFORM_OPERATOR_KEY) return json({error:'Operator access required.'},401);
     if (pathname === '/api/operator/catalog' && method === 'PUT') {
@@ -131,9 +132,12 @@ export default {
     if (url.pathname.startsWith('/api/')) {
       const existing = /(?:^|;\s*)mf_session=([0-9a-f-]{36})(?:;|$)/.exec(request.headers.get('cookie') ?? '')?.[1];
       try {
-        const visitor = existing ?? crypto.randomUUID();
-        const response = await api(request,env,url,visitor);
-        if (!existing) response.headers.append('Set-Cookie', `mf_session=${visitor}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`);
+        const session = request.headers.get('x-motorform-session');
+        if (session !== null && !nativeSessionId.test(session)) return json({error:'Invalid device session.'},400);
+        const native = session !== null && !request.headers.has('origin');
+        const visitor = native ? 'native:'+session : existing ?? crypto.randomUUID();
+        const response = await api(request,env,url,visitor,native);
+        if (!native && !existing) response.headers.append('Set-Cookie', `mf_session=${visitor}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`);
         return response;
       } catch (error) {
         return error instanceof RangeError ? json({error:'Request limit reached.'},429) : json({error:'MotorForm could not load this data. Try again.'},503);
