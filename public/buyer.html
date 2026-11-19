@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111e35"><title>MotorForm App</title><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/app-icon-192.png"><link rel="stylesheet" href="/landing.css"><link rel="stylesheet" href="/buyer.css"></head><body class="buyer-app"><header class="app-header"><a class="logo" href="/" aria-label="MotorForm website">MOTORFORM<span class="period">.</span></a><button class="subtle" id="install-app" hidden>Install app</button></header>  <main class="app-shell"><section data-screen="find" aria-labelledby="finder-heading">
+    <h1 id="finder-heading">Find my car</h1><figure class="app-hero"><img src="/car.webp" alt="Illustrative pearl-white crossover"><figcaption>Hyderabad</figcaption></figure><p class="data-note" id="catalog-label" role="status">Loading catalog…</p>
+    <div class="filterbar">
+      <label>Search cars<input type="search" id="car-search" placeholder="Model or variant"></label>
+      <label for="budget">On-road budget <output id="budget-value" for="budget">₹15 lakh</output><input type="range" id="budget" min="500000" max="3000000" step="50000" value="1500000"></label>
+      <label class="visually-hidden">Primary use<select id="car-use"><option value="">Any use</option><option value="city">City commute</option><option value="family">Family trips</option><option value="highway">Highway driving</option></select></label>
+
+    </div>
+    <div class="preferences">
+      <fieldset><legend>How do you drive?</legend><div class="card-actions" id="use-tiles"><button class="subtle" type="button" data-use="" aria-pressed="true">Any use</button><button class="subtle" type="button" data-use="city">City</button><button class="subtle" type="button" data-use="family">Family</button><button class="subtle" type="button" data-use="highway">Highway</button></div></fieldset>
+      <fieldset><legend>Must-have features</legend><div class="card-actions" id="feature-tiles"></div></fieldset>
+      <button class="button app-primary" type="button" id="recommend" disabled>See matches →</button><button type="button" class="subtle" id="reset-filters" hidden>Reset filters</button>
+
+    </div>
+  </section>
+  <section data-screen="matches" hidden><h1>Matches for you</h1><div class="screen-tools"><a href="#find" class="subtle">Edit preferences</a><button class="subtle" type="button" id="browse-all" hidden>Browse all</button></div>
+    <div class="result-bar"><p id="result-count" role="status"></p>      <label>Sort by<select id="sort"><option value="price">Lowest estimated cost</option><option value="factory">Most factory features</option></select></label></div><div id="car-results" class="app-results"></div>
+    <a class="button app-primary" id="compare-jump" href="#compare" hidden>Compare selected</a>
+  </section>
+  <section data-screen="compare" hidden><h1>Compare variants</h1><p id="compare-empty" class="empty">Select variants on the Matches or Saved screen to compare them.</p><div class="compare-panel" id="compare-panel" hidden><div class="result-bar"><small>Estimated prices · Fitment checks required</small><button type="button" class="subtle" id="clear-compare">Clear</button></div><div class="table-wrap" id="compare-results"></div></div></section>
+  <section data-screen="saved" hidden><h1>Saved cars</h1><div id="saved-results" class="app-results"></div></section>
+  <section data-screen="requests" hidden><h1>My enquiries</h1><button class="subtle" id="my-enquiries" type="button">Refresh</button><div id="history-results"></div></section>
+  <p id="finder-status" class="app-status" role="status"></p>
+  </main>
+  <dialog id="dealer-dialog"><form method="dialog"><div class="result-bar"><h3>Request a quote or test drive</h3><button class="subtle" aria-label="Close">×</button></div></form>
+    <form id="dealer-submit"><strong id="enquiry-title"></strong><label>Request type<select id="enquiry-purpose"><option value="quote">On-road quote</option><option value="test-drive">Test drive</option></select></label>
+    <label>Email<input id="enquiry-email" type="email" maxlength="254" autocomplete="email" required></label><p>MotorForm receives your enquiry and may contact you about it. A dealer booking is confirmed separately.</p>
+    <div class="dealer-actions"><button type="submit" class="button">Send to MotorForm</button></div></form><p id="dealer-status" role="status"></p>
+  </dialog>
+<nav class="app-nav" aria-label="App screens"><a href="#find" data-tab="find"><span aria-hidden="true">⌕</span>Find</a><a href="#matches" data-tab="matches"><span aria-hidden="true">▤</span>Matches</a><a href="#compare" data-tab="compare"><span aria-hidden="true">⇄</span>Compare</a><a href="#saved" data-tab="saved"><span aria-hidden="true">♡</span>Saved</a><a href="#requests" data-tab="requests"><span aria-hidden="true">▣</span>Requests</a></nav><script type="module" src="/finder.js"></script></body></html>

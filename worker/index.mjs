@@ -140,7 +140,7 @@ export default {
       }
     }
     if (!['GET','HEAD'].includes(request.method)) return new Response('Method not allowed',{status:405});
-    const name = {'/':'index.html','/studio':'studio.html','/operator':'operator.html'}[url.pathname] ?? url.pathname.slice(1);
+    const name = {'/':'index.html','/studio':'studio.html','/app':'buyer.html','/app/':'buyer.html','/operator':'operator.html'}[url.pathname] ?? url.pathname.slice(1);
     const asset = Object.hasOwn(assets,name) ? assets[name] : undefined;
     return asset ? new Response(request.method === 'HEAD' ? null : Uint8Array.from(atob(asset.body),c => c.charCodeAt(0)),{headers:{
       'Content-Type':asset.type,

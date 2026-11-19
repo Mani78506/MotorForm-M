@@ -1,0 +1,33 @@
+.buyer-app{background:#eef2f8;color:#101d33}
+.app-header{display:flex;justify-content:space-between;align-items:center;padding:12px max(18px,calc((100vw - 720px)/2));background:#111e35;color:white;min-height:57px}
+.app-shell{width:min(calc(100% - 30px),720px);margin:auto;padding:20px 0 calc(88px + env(safe-area-inset-bottom))}
+.app-shell h1{font-size:clamp(25px,5vw,34px);margin:0 0 14px}
+.app-hero{position:relative;background:#101d33;border-radius:14px;overflow:hidden}
+.app-hero img{display:block;width:100%;height:clamp(170px,38vw,250px);object-fit:cover;object-position:center 52%}
+.app-hero figcaption{position:absolute;inset:12px auto auto 12px;padding:5px 10px;border-radius:20px;background:white;color:#101d33;font-weight:bold}
+.data-note{font-size:12px;margin:8px 0;color:#4a5970}
+.buyer-app .filterbar{grid-template-columns:1fr 1fr;background:white}
+.buyer-app .filterbar label{font-weight:700;font-size:13px}
+.buyer-app .filterbar input[type=range]{padding:0;accent-color:#163f75;height:22px;border:0}
+#budget-value{float:right;padding:0 6px;border-radius:5px;background:#dcecff}
+.buyer-app .preferences{display:grid;justify-content:stretch;border:0}
+.buyer-app .preferences fieldset{background:white;border:1px solid #d8e0ec;border-radius:12px;padding:8px 10px 10px}
+.buyer-app .preferences legend{padding:0 5px}
+.buyer-app .subtle{font-size:13px}
+.app-primary{margin:9px 0;width:100%;border:0;background:#142746;color:white;min-height:44px}
+.app-primary:hover{background:#264c7c}
+.app-nav{position:fixed;z-index:4;bottom:0;left:0;right:0;display:flex;justify-content:center;background:#fff;border-top:1px solid #d7dfeb;padding-bottom:env(safe-area-inset-bottom)}
+.app-nav a{display:grid;justify-items:center;min-width:0;width:min(145px,20%);padding:7px 2px;color:#47556b;font-size:12px;font-weight:650}
+.app-nav a span{font-size:21px;line-height:1.1}
+.app-nav a[aria-current=page]{background:#e4efff;color:#12386b}
+.app-results{display:grid;gap:10px}
+.app-results .card{grid-template-rows:auto;padding:13px;position:relative}
+.app-results .price{color:#163f75}
+.app-results .eyebrow{margin:0}
+.screen-tools{display:flex;gap:7px}
+.app-shell .result-bar label{font-size:12px}
+.app-shell .result-bar select{display:block;max-width:100%;padding:5px;border:1px solid #b8c7d8;border-radius:6px;color:#101d33;background:#fff}
+.app-status{margin:8px 0;color:#3a5573}
+.feature-factory,.feature-unknown{display:inline-block;border-radius:18px;padding:3px 7px;font-size:12px;white-space:nowrap}.feature-factory{background:#d9f1df;color:#184b29}.feature-unknown{background:#edf0f6;color:#4e5b70}
+.compare-panel meter{width:100%;min-width:62px;accent-color:#285c9b}
+@media(max-width:430px){.buyer-app .filterbar{grid-template-columns:1fr}.app-shell .result-bar{align-items:end}}

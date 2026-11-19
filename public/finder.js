@@ -21,7 +21,22 @@ async function api(path, options = {}) {
 }
 const send = (path,method,value) => api(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
 const compared = new Map();
-let savedOnly = false;
+const screens=new Set(['find','matches','compare','saved','requests']);
+let currentScreen='find';
+function showScreen() {
+  const next=location.hash.slice(1);
+  currentScreen=screens.has(next)?next:'find';
+  for (const section of document.querySelectorAll('[data-screen]')) section.hidden=section.dataset.screen!==currentScreen;
+  for (const link of document.querySelectorAll('[data-tab]')) {
+    if (link.dataset.tab===currentScreen) link.setAttribute('aria-current','page');
+    else link.removeAttribute('aria-current');
+  }
+  $('finder-status').textContent='';
+  updateCards();
+  if (currentScreen==='requests' && ready) loadEnquiries();
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',showScreen);
 
 function tell(message) {
   $('finder-status').textContent = message;
@@ -32,32 +47,32 @@ function updateCards() {
   const limit = Number($('budget').value);
   $('reset-filters').hidden = !required.size && Object.entries(defaultFilters).every(([id,value]) => $(id).value === value);
   const use = $('car-use').value;
+  $('budget-value').textContent='₹'+new Intl.NumberFormat('en-IN',{maximumFractionDigits:1}).format(limit/100000)+' lakh';
   if (!ready) return;
   const requested = [...required];
   const requiredCost = car => requested.filter(id => car.options.includes(id)).reduce((sum,id) => sum+features[id].cost,0);
-  const candidates = cars.filter(car => (!savedOnly || saved.has(car.id)) &&
-    query.every(term => `${car.model} ${car.trim} ${car.body}`.toLowerCase().includes(term)) &&
-    (savedOnly || ((!use || car.uses.includes(use)) && requested.every(id => car.factory.includes(id) || car.options.includes(id)) &&
-    onRoad(car) + requiredCost(car) <= limit && (!recommendations || recommendations.has(car.id)))));
-  candidates.sort((a,b) => recommendations && !savedOnly ? recommendations.get(a.id)-recommendations.get(b.id) :
+  const candidates = cars.filter(car => query.every(term => `${car.model} ${car.trim} ${car.body}`.toLowerCase().includes(term)) &&
+    ((!use || car.uses.includes(use)) && requested.every(id => car.factory.includes(id) || car.options.includes(id)) &&
+    onRoad(car) + requiredCost(car) <= limit && (!recommendations || recommendations.has(car.id))));
+  candidates.sort((a,b) => recommendations ? recommendations.get(a.id)-recommendations.get(b.id) :
     ($('sort').value === 'factory' ? b.factory.length-a.factory.length : 0) ||
     onRoad(a)+requiredCost(a)-onRoad(b)-requiredCost(b));
   $('browse-all').hidden = !recommendations;
-  $('shortlist-toggle').textContent = savedOnly ? 'Browse all variants' : 'Shortlist (' + saved.size + ')';
-  $('shortlist-toggle').setAttribute('aria-pressed', savedOnly);
-  $('result-count').textContent = candidates.length + (candidates.length === 1 ? ' variant' : ' variants') + (savedOnly ? ' shortlisted' : ' found');
-  $('car-results').innerHTML = candidates.map(car => `<article class="variant card">
+  $('result-count').textContent = candidates.length + (recommendations?' best matches':' variants found');
+  const renderCard=(car, cost, selected)=>`<article class="variant card">
     <p class="eyebrow">${car.body}</p><div><h3>${car.model}</h3><p>${car.trim} · ${car.fuel} · ${car.gearbox}</p>${car.year ? `<small>${Number(car.year)} · ${escape(car.priceDate)} · ${escape(car.source)}</small>` : ''}</div>
-    <div><p class="price">${format(onRoad(car) + requiredCost(car))}</p><small>Estimated on-road${requiredCost(car) ? ' + selected feature' : ''}</small></div>
-    <div class="tags">${car.factory.map(key => `<span>${features[key].name} · factory</span>`).join('')}${requested.filter(id=>car.options.includes(id)).map(id=>`<span>${features[id].name} · check fitment</span>`).join('')}</div>
+    <div><p class="price">${format(onRoad(car) + cost)}</p><small>Estimated on-road${cost ? ' + selected upgrades' : ''}</small></div>
+    <div class="tags">${car.factory.map(key => `<span>${features[key].name} · factory</span>`).join('')}${selected.filter(id=>car.options.includes(id)).map(id=>`<span>${features[id].name} · check fitment</span>`).join('')}</div>
     <div class="card-actions"><button class="subtle" data-compare="${car.id}" aria-pressed="${compared.has(car.id)}">${compared.has(car.id) ? '✓ Compare' : 'Compare'}</button><button class="subtle" data-save="${car.id}" aria-pressed="${saved.has(car.id)}">${saved.has(car.id) ? '✓ Saved' : 'Save'}</button><button class="subtle" data-dealer="${car.id}">Dealer enquiry</button><a class="configure" href="${studioLink(car)}">Preview upgrades ↗</a></div>
-  </article>`).join('') || `<p class="empty">${savedOnly && !saved.size ? 'Save a variant to start your shortlist.' : 'No matching variants. Try another search or reset the filters.'}</p>`;
+  </article>`;
+  $('car-results').innerHTML=candidates.map(car=>renderCard(car,requiredCost(car),requested)).join('') || '<p class="empty">No exact matches. Try a higher budget or fewer features.</p>';
+  $('saved-results').innerHTML=cars.filter(car=>saved.has(car.id)).map(car=>renderCard(car,0,[])).join('') || '<p class="empty">Save a variant on the Matches screen.</p>';
 }
 
 function studioLink(car) {
   const make = car.model.startsWith('Maruti Suzuki ') ? 'Maruti Suzuki' : car.model.split(' ')[0];
   const model = car.model.slice(make.length + 1);
-  return './studio.html?' + new URLSearchParams({ make, model, variant: car.trim });
+  return '/studio.html?' + new URLSearchParams({ make, model, variant: car.trim });
 }
 
 function upgradeTotal(id) {
@@ -67,14 +82,16 @@ function upgradeTotal(id) {
 function updateComparison() {
   const columns = [...compared.keys()].map(byId);
   $('compare-panel').hidden = columns.length === 0;
+  $('compare-empty').hidden = columns.length > 0;
   $('compare-jump').hidden = !columns.length;
   $('compare-jump').textContent = 'View comparison (' + columns.length + ')';
   if (!columns.length) return;
   const row = (title, render) => `<tr><th scope="row">${title}</th>${columns.map(car => `<td>${render(car)}</td>`).join('')}</tr>`;
   $('compare-results').innerHTML = `<table><thead><tr><th scope="col">Hyderabad estimate</th>${columns.map(car => `<th scope="col">${car.model}<br>${car.trim}</th>`).join('')}</tr></thead><tbody>
+    ${row('Estimated on-road', car => `<strong>${format(onRoad(car))}</strong><meter aria-label="Estimated on-road price" min="0" max="${Math.max(1,...columns.map(onRoad))}" value="${onRoad(car)}"></meter>`)}
     ${row('Vehicle price', car => format(car.base))}
     ${row('Registration & insurance estimate', car => format(car.costs))}
-    ${Object.entries(features).map(([key,feature]) => row(feature.name, car => car.factory.includes(key) ? 'Factory fitted' : car.options.includes(key) ? `<label><input type="checkbox" data-upgrade="${car.id}" value="${key}" ${compared.get(car.id).has(key) ? 'checked' : ''}> Add ${format(feature.cost)}</label>` : 'Unconfirmed')).join('')}
+    ${Object.entries(features).map(([key,feature]) => row(feature.name, car => car.factory.includes(key) ? '<span class="feature-factory">✓ Factory</span>' : car.options.includes(key) ? `<label><input type="checkbox" data-upgrade="${car.id}" value="${key}" ${compared.get(car.id).has(key) ? 'checked' : ''}> Add ${format(feature.cost)}</label>` : '<span class="feature-unknown">Unconfirmed</span>')).join('')}
     ${row('Total with selected upgrades', car => `<strong>${format(onRoad(car)+upgradeTotal(car.id))}</strong>`)}
     ${row('Next step', car => `<button class="subtle" data-dealer="${car.id}">Dealer enquiry</button>`)}</tbody></table>`;
 }
@@ -114,11 +131,10 @@ $('recommend').addEventListener('click',async()=>{
   try {
     const matches=await api('matches?'+params);
     if(version!==requestVersion) return;
-    savedOnly=false;
     recommendations=new Map(matches.map((match,index)=>[match.id,index]));
     updateCards();
-    $('result-count').textContent=matches.length ? matches.length+' best matches' : 'No exact matches';
-  } catch(error) { tell(error.message); $('result-count').textContent=error.message; }
+    location.hash='matches';
+  } catch(error) { tell(error.message); }
 });
 $('car-search').addEventListener('input', changeFilters);
 $('reset-filters').addEventListener('click', () => {
@@ -129,13 +145,13 @@ $('reset-filters').addEventListener('click', () => {
   changeFilters();
   $('car-search').focus();
 });
-for (const id of ['budget','car-use','sort']) $(id).addEventListener('change', changeFilters);
-$('shortlist-toggle').addEventListener('click', () => { savedOnly = !savedOnly; updateCards(); });
+$('budget').addEventListener('input',changeFilters);
+for (const id of ['car-use','sort']) $(id).addEventListener('change', changeFilters);
 $('clear-compare').addEventListener('click', () => {
   compared.clear();
   updateCards();
   updateComparison();
-  $('shortlist-toggle').focus();
+  document.querySelector('[data-tab=compare]').focus();
 });
 document.addEventListener('click', async event => {
   const button = event.target.closest('button');
@@ -149,7 +165,7 @@ document.addEventListener('click', async event => {
       if (next) saved.add(save); else saved.delete(save);
     } catch(error) { tell(error.message); $('result-count').textContent=error.message; button.disabled=false; return; }
     updateCards();
-    (document.querySelector('[data-save="' + save + '"]') ?? $('shortlist-toggle')).focus();
+    (document.querySelector('[data-screen]:not([hidden]) [data-save="' + save + '"]') ?? document.querySelector('[data-tab='+currentScreen+']')).focus();
   }
   if (compare) {
     if (compared.has(compare)) compared.delete(compare);
@@ -159,7 +175,7 @@ document.addEventListener('click', async event => {
     }
     updateCards();
     updateComparison();
-    document.querySelector('[data-compare="' + compare + '"]')?.focus();
+    document.querySelector('[data-screen]:not([hidden]) [data-compare="' + compare + '"]')?.focus();
   }
   if (dealer) prepareEnquiry(dealer);
 });
@@ -186,14 +202,29 @@ $('dealer-submit').addEventListener('submit',async event=>{
   } catch(error) { $('dealer-status').textContent=error.message; }
   finally { submit.disabled=false; }
 });
-$('my-enquiries').addEventListener('click',async()=>{
+async function loadEnquiries(){
   $('history-results').textContent='Loading…';
-  $('history-dialog').showModal();
   try {
     const rows=await api('enquiries');
     $('history-results').innerHTML=rows.map(row=>`<p class="history-row"><strong>${escape(row.title)}</strong><br>${escape(row.purpose)} · ${row.status==='received'?'Received by MotorForm':escape(row.status)}</p>`).join('') || '<p>No enquiries from this browser yet.</p>';
   } catch(error) { $('history-results').textContent=error.message; }
+}
+$('my-enquiries').addEventListener('click',loadEnquiries);
+let installPrompt;
+window.addEventListener('beforeinstallprompt',event=>{
+  event.preventDefault();
+  installPrompt=event;
+  $('install-app').hidden=false;
 });
+$('install-app').addEventListener('click',async()=>{
+  if (!installPrompt) return;
+  await installPrompt.prompt();
+  installPrompt=undefined;
+  $('install-app').hidden=true;
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/app-sw.js',{scope:'/app/'}).catch(()=>{});
+
+showScreen();
 try {
   const data=await api('catalog');
   cars=data.cars;
@@ -204,5 +235,6 @@ try {
   const shortlist=await api('shortlist');
   shortlist.filter(byId).forEach(id=>saved.add(id));
   ready=true;
-  updateCards();
-} catch(error) { $('result-count').textContent=error.message; }
+  $('recommend').disabled=false;
+  showScreen();
+} catch(error) { $('catalog-label').textContent=error.message; tell(error.message); }

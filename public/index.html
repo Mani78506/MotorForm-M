@@ -23,36 +23,14 @@
         <p class="eyebrow"><span></span> HYDERABAD PILOT</p>
         <h1 id="headline"><span>Find the right car.</span><em>Make it yours.</em></h1>
         <p>Compare variants, see which features come standard, and estimate what it would cost to add the upgrades you want.</p>
-        <div class="actions"><a class="button" href="#finder">Find my car <span aria-hidden="true">↗</span></a><a class="text-link" href="./studio.html">I already own a car <span aria-hidden="true">↗</span></a></div>
+        <div class="actions"><a class="button" href="/app/">Open the app <span aria-hidden="true">↗</span></a><a class="text-link" href="./studio.html">I already own a car <span aria-hidden="true">↗</span></a></div>
       </div>
       <figure><img src="./car.webp" width="1536" height="1024" alt="Pearl-white crossover with a black roof in a dark studio"><figcaption>Illustrative vehicle preview</figcaption></figure>
     </div>
   </section>
-  <section class="shell finder" id="finder" aria-labelledby="finder-heading">
-    <div class="section-heading"><div><p class="eyebrow">NEW-CAR FINDER</p><h2 id="finder-heading">What fits your budget?</h2></div><p>Hyderabad · <span id="catalog-label">Loading catalog</span></p></div>
-    <div class="filterbar">
-      <label>Search cars<input type="search" id="car-search" placeholder="Model or variant"></label>
-      <label>Maximum budget<select id="budget"><option value="1000000">₹10 lakh</option><option value="1500000" selected>₹15 lakh</option><option value="2000000">₹20 lakh</option><option value="99999999">Any budget</option></select></label>
-      <label class="visually-hidden">Primary use<select id="car-use"><option value="">Any use</option><option value="city">City commute</option><option value="family">Family trips</option><option value="highway">Highway driving</option></select></label>
-      <label>Sort by<select id="sort"><option value="price">Lowest estimated cost</option><option value="factory">Most factory features</option></select></label>
-    </div>
-    <div class="preferences">
-      <fieldset><legend>How do you drive?</legend><div class="card-actions" id="use-tiles"><button class="subtle" type="button" data-use="" aria-pressed="true">Any use</button><button class="subtle" type="button" data-use="city">City</button><button class="subtle" type="button" data-use="family">Family</button><button class="subtle" type="button" data-use="highway">Highway</button></div></fieldset>
-      <fieldset><legend>Must-have features</legend><div class="card-actions" id="feature-tiles"></div></fieldset>
-      <button class="button" type="button" id="recommend">See best matches →</button>
-      <button class="subtle" type="button" id="browse-all" hidden>Browse all</button>
-    </div>
-    <div class="result-bar"><p id="result-count" role="status"></p><div class="card-actions"><button type="button" class="subtle" id="my-enquiries">My enquiries</button><button type="button" class="subtle" id="reset-filters" hidden>Reset filters</button><a class="subtle" id="compare-jump" href="#compare-panel" hidden>View comparison</a><button type="button" class="subtle" id="shortlist-toggle" aria-pressed="false">Shortlist (0)</button></div></div>
-    <div class="compare-panel" id="compare-panel" hidden><div class="result-bar"><div><h3>Compare variants</h3><p>Upgrade estimates are optional and require fitment confirmation.</p></div><button type="button" class="subtle" id="clear-compare">Clear comparison</button></div><div class="table-wrap" id="compare-results"></div></div>
-    <div id="car-results" class="cards"></div>
-    <p id="finder-status" class="visually-hidden" role="status"></p>
-  </section>
-  <dialog id="dealer-dialog"><form method="dialog"><div class="result-bar"><h3>Request a quote or test drive</h3><button class="subtle" aria-label="Close">×</button></div></form>
-    <form id="dealer-submit"><strong id="enquiry-title"></strong><label>Request type<select id="enquiry-purpose"><option value="quote">On-road quote</option><option value="test-drive">Test drive</option></select></label>
-    <label>Email<input id="enquiry-email" type="email" maxlength="254" autocomplete="email" required></label><p>MotorForm receives your enquiry and may contact you about it. A dealer booking is confirmed separately.</p>
-    <div class="dealer-actions"><button type="submit" class="button">Send to MotorForm</button></div></form><p id="dealer-status" role="status"></p>
-  </dialog>
-  <dialog id="history-dialog"><form method="dialog"><div class="result-bar"><h3>My enquiries</h3><button class="subtle" aria-label="Close">×</button></div></form><div id="history-results"></div></dialog>
+  <section class="shell website-preview" id="finder" aria-labelledby="preview-heading">
+  <div class="section-heading"><div><p class="eyebrow">THE MOTORFORM APP</p><h2 id="preview-heading">From budget to test drive.</h2></div><a class="button" href="/app/">Open the app ↗</a></div>
+  <div class="cards"><a class="card preview-step" href="/app/#find"><span aria-hidden="true">⌕</span><h3>Find your car</h3><p>Set your on-road budget and tap the features you need.</p></a><a class="card preview-step" href="/app/#matches"><span aria-hidden="true">▤</span><h3>See your matches</h3><p>See exact trims, estimated prices and factory equipment.</p></a><a class="card preview-step" href="/app/#compare"><span aria-hidden="true">⇄</span><h3>Compare and enquire</h3><p>Check the cost with upgrades, then request a quote or test drive.</p></a></div></section>
   <section class="offers shell" id="offers" aria-labelledby="offer-heading">
     <div class="section-heading"><div><p class="eyebrow">FOR CAR OWNERS</p><h2 id="offer-heading">Start with what your car needs.</h2></div><p>Choose a package, then adjust the upgrades in Studio to suit your car and budget.</p></div>
     <div class="cards">
@@ -70,9 +48,9 @@
     <details><summary>Can I choose upgrades without cutting factory wiring?</summary><p>Use the no-factory-wiring-cuts filter in Studio. Ask your manufacturer or authorised dealer about warranty coverage for the exact accessory and installation method.</p></details>
     <details><summary>Can I book a real installation today?</summary><p>The current Studio is a public demo. Estimates are illustrative, and requests are saved in your browser. Live workshop scheduling and payments are planned.</p></details>
   </div></section>
-  <section class="shell closing"><div><h2>Ready to narrow your shortlist?</h2><a class="button" href="#finder">Find my car <span aria-hidden="true">↗</span></a></div></section>
+  <section class="shell closing"><div><h2>Ready to narrow your shortlist?</h2><a class="button" href="/app/">Open the app <span aria-hidden="true">↗</span></a></div></section>
 </main>
 <footer><div class="shell"><a class="logo" href="./">MOTORFORM<span class="period">.</span></a><span>Hyderabad, India</span></div></footer>
-<script type="module" src="./finder.js"></script>
+
 </body>
 </html>
