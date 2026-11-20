@@ -16,7 +16,9 @@ export type DecisionConfidence={dealerAvailability:{active:number;responsive:num
 export type PreownedAssessment={allInCost:{askingPrice:number;transfer:number;inspection:number;immediateRepairs:number;plannedUpgrades:number;total:number;disclaimer:string};evidence:{verified:string[];missing:string[];failed:string[]};riskLevel:'Lower'|'Medium'|'High';worthInspecting:boolean;decision:string;nextChecks:string[]};
 export type RecommendationResponse = {source:'india_provider'|'internal_estimate';city:City;items:Recommendation[];decisionPaths?:{bestValue?:string;bestComfort?:string;safeAlternative?:string};attribution:{name:string;url:string|null};datasetRevision?:string|null};
 
-const base = 'https://motorform-hyderabad.cozymatch1.chatgpt.site';
+// Set EXPO_PUBLIC_API_BASE for every preview/production build. The fallback is
+// retained only so existing Expo Go users can continue using the prior pilot.
+const base = (process.env.EXPO_PUBLIC_API_BASE || 'https://motorform-hyderabad.cozymatch1.chatgpt.site').replace(/\/$/,'');
 const key = 'motorform-device-session-v1';
 let session: Promise<string> | undefined;
 

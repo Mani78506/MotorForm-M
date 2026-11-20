@@ -27,3 +27,7 @@ npm run bundle
 To create an internal Android APK through Expo, link the project to your Expo account and run `npx eas-cli build --platform android --profile preview`. The selected Expo account manages the build credentials.
 
 The app uses a per-installation identity kept in SecureStore for saved cars and enquiries. Browsing and recommendations are public. Prices include sourced estimates where available. Equipment and upgrade fitment remain illustrative.
+
+For a production build, set `EXPO_PUBLIC_API_BASE` to the deployed Worker HTTPS
+origin. It is public configuration; never place `PMC_API_KEY` in the mobile app.
+See the repository's `DEPLOYMENT.md` for the release sequence.
