@@ -6,12 +6,12 @@ import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navig
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
-import { Catalog, Car, Enquiry, Match, Recommendation, DecisionConfidence, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, getDecisionConfidence, recordComparison, loadCatalog, offlineMatches, onRoad, rupees } from './api';
+import { Catalog, Car, Enquiry, Match, Recommendation, DecisionConfidence, PreownedAssessment, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, getDecisionConfidence, recordComparison, assessPreowned, loadCatalog, offlineMatches, onRoad, rupees } from './api';
 
 const navy='#102643', ink='#10213A', blue='#1C5CA8', muted='#4B5D75', border='#D9E3EF';
 type Icon=React.ComponentProps<typeof Ionicons>['name'];
 type Tabs={ Find:undefined; Matches:undefined; Compare:undefined; Saved:undefined };
-type Stack={ Landing:undefined; Home:NavigatorScreenParams<Tabs> | undefined; Details:{id:string}; Enquire:{id:string; upgrades:string[]}; ProviderEnquire:{item:Recommendation;city:string}; Requests:undefined };
+type Stack={ Landing:undefined; Home:NavigatorScreenParams<Tabs> | undefined; Details:{id:string}; Enquire:{id:string; upgrades:string[]}; ProviderEnquire:{item:Recommendation;city:string}; UsedCheck:undefined; Requests:undefined };
 const Tab=createBottomTabNavigator<Tabs>();
 const Root=createNativeStackNavigator<Stack>();
 type Go=NativeStackScreenProps<Stack,'Home'>['navigation'];
@@ -92,6 +92,12 @@ function FindScreen({catalog,busy,error,onFind,onCity}:{catalog:Catalog;busy:boo
     <Button label={busy?'Finding matches…':'Build my shortlist'} icon="arrow-forward" disabled={busy} onPress={()=>onFind(budget,use,features,query,{priority,household,transmission})}/>
     {catalog.illustrative&&<Text style={s.small}>Sourced prices where shown. Equipment and upgrade fitment are illustrative.</Text>}
   </Frame>;
+}
+function UsedCarCheck() {
+  const [asking,setAsking]=useState('650000'); const [repairs,setRepairs]=useState('0'); const [result,setResult]=useState<PreownedAssessment>(); const [error,setError]=useState(''); const [pending,setPending]=useState(false);
+  const [checks,setChecks]=useState<Record<string,'verified'|'reported'|'missing'|'failed'>>({rc:'missing',insurance:'missing',service_history:'missing',odometer:'missing',inspection:'missing',accident:'missing',flood:'missing'});
+  async function assess(){const price=Number(asking);const repair=Number(repairs);if(!Number.isSafeInteger(price)||price<100000||!Number.isSafeInteger(repair)||repair<0)return setError('Enter whole-number asking price and immediate repair estimate.');setPending(true);setError('');try{setResult(await assessPreowned({askingPrice:price,transferCost:18000,inspectionCost:3500,immediateRepairCost:repair,checks}));}catch(e){setError(e instanceof Error?e.message:'Could not assess this vehicle.');}finally{setPending(false);}}
+  return <Frame><Text style={s.title}>Is this used car worth inspecting?</Text><Text style={s.small}>Assess one specific vehicle. MotorForm includes known purchase-day costs and shows what evidence is still missing.</Text><TextInput accessibilityLabel="Asking price" value={asking} onChangeText={setAsking} keyboardType="number-pad" placeholder="Asking price" style={s.input}/><TextInput accessibilityLabel="Immediate repairs" value={repairs} onChangeText={setRepairs} keyboardType="number-pad" placeholder="Tyres, service or repairs now" style={s.input}/><Text style={s.heading}>Evidence status</Text>{Object.entries(checks).map(([key,status])=><View style={s.checkLine} key={key}><Text style={s.flex}>{key.replace('_',' ')}</Text><Chip label={status==='verified'?'Verified':'Missing'} selected={status==='verified'} onPress={()=>setChecks(current=>({...current,[key]:current[key]==='verified'?'missing':'verified'}))}/></View>)}{error?<Text style={s.error}>{error}</Text>:null}<Button label={pending?'Assessing…':'Assess this vehicle'} disabled={pending} onPress={()=>void assess()}/>{result?<View style={s.confidencePanel}><Text style={s.heading}>{result.riskLevel} evidence risk · {result.worthInspecting?'Worth inspecting':'Do not commit yet'}</Text><Text style={s.price}>All-in plan: {rupees(result.allInCost.total)}</Text><Text style={s.small}>{result.decision}</Text><Text style={s.heading}>Before you pay anything</Text>{result.nextChecks.map(item=><Text style={s.small} key={item}>• {item}</Text>)}<Text style={s.tiny}>{result.allInCost.disclaimer}</Text></View>:null}</Frame>;
 }
 function CarCard({car,total,features,matched,saved,selected,onSave,onCompare,onOpen}:{car:Car;total:number;features:Catalog['features'];matched:Match|undefined;saved:boolean;selected:boolean;onSave:()=>void;onCompare:()=>void;onOpen:()=>void}) {
   return <View style={s.card}>
@@ -278,6 +284,7 @@ function MotorForm() {
         {providerMatches.length ? <><View style={s.confidencePanel}><Text style={s.heading}>Decision confidence</Text><Text style={s.small}>{confidence?.dealerAvailability.label ?? 'Checking local dealer availability…'}</Text><Text style={s.small}>{confidence?.reviews.label ?? 'Verified review coverage is not connected.'}</Text></View><Text style={s.small}>{providerMatches.length} recommended variants · {catalog!.city.name} · {recommendationAttribution}</Text>{providerMatches.map(item=><RecommendationCard key={item.id} item={item} attribution={recommendationAttribution} saved={providerSaved.some(value=>value.id===item.id)} onSave={()=>void saveProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}</> : matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · {catalog!.city.name} · Internal estimates</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
         {list(go,(matches??[]).flatMap(match=>cars.filter(car=>car.id===match.id)),true)}
         {compare.length>0&&<Button label={'Compare ('+compare.length+')'} icon="swap-horizontal-outline" onPress={()=>navigation.navigate('Compare')}/>}
+        <Button label="Check a used car" secondary onPress={()=>navigation.navigate('UsedCheck')}/>
         <Button label="Edit preferences" secondary onPress={()=>navigation.navigate('Find')}/>
       </Frame>}</Tab.Screen>
       <Tab.Screen name="Compare" options={{title:'Compare variants',tabBarLabel:'Compare'}}>{()=><Compare cars={compare.flatMap(id=>cars.filter(car=>car.id===id))} catalog={catalog!} upgrades={upgrades} toggle={toggle} onEnquire={car=>openEnquiry(go,car)}/>}</Tab.Screen>
@@ -299,6 +306,7 @@ function MotorForm() {
       return car?<Enquire {...route.params} car={car} city={catalog.city.id} onDone={()=>{setRevision(value=>value+1);navigation.popTo('Home',{screen:'Requests'});}}/>:<Frame><Empty icon="car-outline" title="Variant unavailable" detail="Return to Matches to choose another car."/></Frame>;
     }}</Root.Screen>
     <Root.Screen name="ProviderEnquire" options={{title:'Dealer enquiry'}}>{({route,navigation})=><ProviderEnquire {...route.params} onDone={()=>{setRevision(value=>value+1);navigation.popTo('Home',{screen:'Requests'});}}/>}</Root.Screen>
+    <Root.Screen name="UsedCheck" options={{title:'Used-car decision'}} component={UsedCarCheck}/>
     <Root.Screen name="Requests" options={{title:'My enquiries'}}>{()=><Requests revision={revision}/>}</Root.Screen>
   </Root.Navigator>;
 }
@@ -336,6 +344,7 @@ const s=StyleSheet.create({
   sourceLink:{color:blue,fontSize:13,fontWeight:'700'},
   error:{color:'#9B2637',fontWeight:'700'},empty:{alignItems:'center',gap:8,padding:23,borderRadius:14,backgroundColor:'#FFF',borderWidth:1,borderColor:border},
   featureLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:border,paddingBottom:8},
+  checkLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:border,paddingVertical:7},
   headerAction:{paddingHorizontal:16,paddingVertical:6},compareTable:{padding:11,backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:12,gap:11},compareRow:{flexDirection:'row',gap:9},
   compareFeature:{gap:6,paddingTop:8,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:border},bar:{height:7,backgroundColor:'#DEEAF9',borderRadius:5,overflow:'hidden'},
   barFill:{height:7,backgroundColor:blue,borderRadius:5},

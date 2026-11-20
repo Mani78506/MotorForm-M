@@ -117,6 +117,29 @@ function archetypes(items) {
   const safe=[...items].filter(item=>item.budgetRisk==='Comfortable').sort((a,b)=>b.fitScore-a.fitScore)[0] ?? items[0];
   return {bestValue:cheapest.id,bestComfort:comfort.id,safeAlternative:safe.id};
 }
+function preownedAssessment(input) {
+  const asking=input.askingPrice;
+  const transfer=input.transferCost ?? 0;
+  const inspection=input.inspectionCost ?? 0;
+  const immediate=input.immediateRepairCost ?? 0;
+  const upgrades=input.upgradeCost ?? 0;
+  const allIn=asking+transfer+inspection+immediate+upgrades;
+  const required=['rc','insurance','service_history','odometer','inspection','accident','flood'];
+  const checks=input.checks ?? {};
+  const missing=required.filter(key=>checks[key]!=='verified');
+  const failed=required.filter(key=>checks[key]==='failed');
+  const risk=failed.length?'High':missing.length>=4?'High':missing.length>=2?'Medium':'Lower';
+  const next=[];
+  if (checks.rc!=='verified') next.push('Verify RC ownership and transfer eligibility');
+  if (checks.insurance!=='verified') next.push('Verify current insurance and claim history');
+  if (checks.service_history!=='verified') next.push('Request dated service records');
+  if (checks.odometer!=='verified') next.push('Validate odometer against service history');
+  if (checks.inspection!=='verified') next.push('Book an independent pre-purchase inspection');
+  if (checks.accident!=='verified'||checks.flood!=='verified') next.push('Check accident and flood exposure before any token payment');
+  if (immediate>0) next.push('Get written estimates for immediate repairs before negotiating');
+  const worthInspecting=!failed.length && (missing.length<=5);
+  return {allInCost:{askingPrice:asking,transfer,inspection,immediateRepairs:immediate,plannedUpgrades:upgrades,total:allIn,disclaimer:'Planning estimate only. Confirm transfer fees, condition and repair quotes before payment.'},evidence:{verified:required.filter(key=>checks[key]==='verified'),missing,failed},riskLevel:risk,worthInspecting,decision:failed.length?'Do not commit until failed checks are explained and independently verified.':missing.length>=4?'Too much evidence is missing to judge this vehicle safely. Inspect before any commitment.':'Worth inspecting if the all-in cost still fits your budget.',nextChecks:next.slice(0,5)};
+}
 async function recordInteraction(db,visitor,vehicleId,action) {
   await db.prepare('INSERT INTO buyer_interactions (id,visitor,vehicle_id,action,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),visitor,vehicleId,action,new Date().toISOString()).run();
 }
@@ -327,6 +350,15 @@ async function api(request, env, url, visitor, native) {
     if (!input || !clean(input.vehicleId,120) || input.action!=='compared') return json({error:'Invalid interaction.'},400);
     await recordInteraction(db,visitor,input.vehicleId,'compared');
     return json({ok:true},201);
+  }
+  if (pathname === '/api/preowned/assess' && method === 'POST') {
+    const input=await body(request);
+    const costs=['askingPrice','transferCost','inspectionCost','immediateRepairCost','upgradeCost'];
+    const checkNames=['rc','insurance','service_history','odometer','inspection','accident','flood'];
+    if (!input || !amount(input.askingPrice) || input.askingPrice<100000 || input.askingPrice>10000000 || !costs.slice(1).every(key=>input[key]===undefined||amount(input[key])) || (input.checks!==undefined && (typeof input.checks!=='object'||!checkNames.every(key=>input.checks[key]===undefined||['verified','reported','missing','failed'].includes(input.checks[key]))))) return json({error:'Provide a valid used-car price, costs and evidence status.'},400);
+    const assessment=preownedAssessment(input);
+    await recordInteraction(db,visitor,'preowned:'+cacheHash(JSON.stringify({askingPrice:input.askingPrice,year:input.year ?? null,odometer:input.odometerKm ?? null})),'compared');
+    return json({source:'motorform_planning_estimate',...assessment});
   }
   if (pathname === '/api/provider-comparisons' && method === 'POST') {
     await enforceRateLimit(db,visitor,'provider',8);
