@@ -74,8 +74,7 @@ function fitExplanation(choice, input, factoryFeatures=[]) {
   const why=[];
   const watch=[];
   if (price && budget) {
-    if (price<=budget*.85) { score+=25; why.push('Leaves '+Math.round(headroom/1000)+'k of your on-road budget free'); }
-    else if (price<=budget) { score+=17; why.push('Fits within your stated on-road budget'); }
+    if (price<=budget) { score+=Math.round(4+(headroom/budget)*60); why.push(headroom>=100000?'Leaves '+Math.round(headroom/1000)+'k of your on-road budget free':'Fits within your stated on-road budget'); }
     else { score-=35; watch.push('Estimated on-road price exceeds your stated budget'); }
   }
   const isAutomatic=/auto|amt|cvt|dct|ivt/i.test(choice.gearbox ?? '');
@@ -91,11 +90,17 @@ function fitExplanation(choice, input, factoryFeatures=[]) {
   const labels=[...factoryFeatures,...(choice.highlights ?? [])].join(' ').toLowerCase();
   const wanted=(input.features ?? []).filter(id=>id==='automatic'||(id==='camera'&&/camera|parking/i.test(labels))||(id==='phone'&&/carplay|android auto|infotainment/i.test(labels)));
   if (wanted.length) { score+=wanted.length*6; why.push('Includes '+wanted.length+' of your requested features'); }
-  if (decision.priority==='value' && price && budget && price<=budget*.9) { score+=8; why.push('Strong budget headroom for insurance or accessories'); }
+  if (decision.priority==='value' && price && budget) { score+=Math.round((headroom/budget)*12); if (price<=budget*.9) why.push('Strong budget headroom for insurance or accessories'); }
   if (decision.priority==='comfort' && isAutomatic) { score+=6; why.push('Automatic option supports easier daily driving'); }
-  if (decision.priority==='features' && (choice.highlights ?? []).length>=3) { score+=6; why.push('Has a stronger listed feature set'); }
+  if (decision.priority==='features') { score+=Math.min(10,Math.floor((choice.highlights ?? []).length/2)); if ((choice.highlights ?? []).length>=3) why.push('Has a stronger listed feature set'); }
+  if (decision.priority==='comfort') score+=Math.min(6,Math.floor((choice.highlights ?? []).length/4));
   if ((choice.limitations ?? []).length) watch.push(choice.limitations[0]);
   return {fitScore:Math.max(1,Math.min(99,Math.round(score))),whyItFits:why.slice(0,3),watchOuts:watch.slice(0,2),budgetHeadroom:headroom,decisionLabel:score>=75?'Strong fit':score>=55?'Worth a look':'Trade-offs to review'};
+}
+function providerModelName(modelId) {
+  const known={magnite:'Nissan Magnite',dzire:'Maruti Suzuki Dzire',baleno:'Maruti Suzuki Baleno',punch:'Tata Punch',nexon:'Tata Nexon',swift:'Maruti Suzuki Swift',creta:'Hyundai Creta'};
+  if (known[modelId]) return known[modelId];
+  return String(modelId ?? '').split('-').map(part=>part.charAt(0).toUpperCase()+part.slice(1)).join(' ');
 }
 function confidenceFor(choice,input) {
   const price=Number(choice.onRoad)||0;
@@ -151,7 +156,7 @@ function providerRecommendations(result, input) {
     id:'pmc:'+item.carId+':'+item.variantId,
     providerVariantId:item.variantId,
     modelId:item.carId,
-    name:item.name,
+    name:(providerModelName(item.carId)+' '+item.name).trim(),
     exShowroom:item.exShowroom,
     onRoad:item.onRoad,
     fuel:item.fuel,
