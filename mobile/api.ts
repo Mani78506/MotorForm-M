@@ -12,6 +12,9 @@ export type Catalog = { cars: Car[]; features: Record<string, Feature>; illustra
 export type Match = { id: string; total: number; upgrades: string[]; factoryCount: number };
 export type Enquiry = { id: string; title: string; purpose: 'quote' | 'test-drive'; status: string; created_at: string };
 export type Recommendation = {id:string;providerVariantId?:string;modelId?:string;name:string;onRoad:number;exShowroom?:number;fuel:string;gearbox:string;seats?:number|null;highlights:string[];limitations:string[];sources:{label:string;url:string;kind:string;checkedAt:string}[];pricesVerified?:string|null;specsVerified?:string|null;dataUpdated?:string|null;coverageNote?:string|null;estimatedMonthlyRunningCost?:number|null;estimatedOwnershipCost?:number|null;detailUrl?:string|null;fitScore?:number;whyItFits?:string[];watchOuts?:string[];budgetHeadroom?:number;decisionLabel?:string;ownershipEstimate?:{period:string;fuel:number;service:number;insurance:number;total:number;disclaimer:string};budgetRisk?:'Comfortable'|'Watch spend'|'Stretch'|'Over budget';riskNote?:string};
+export type ProviderFeature={featureId:string;name:string;value:boolean|string|null;note?:string|null};
+export type ProviderComparisonItem={carId:string;variantId:string;name:string;exShowroom?:number;onRoad?:number;features:ProviderFeature[];sources:{label:string;url:string;kind:string;checkedAt:string}[];detailUrl?:string|null};
+export type ProviderComparison={source:'india_provider';items:ProviderComparisonItem[];comparisonUrl?:string|null;attribution:{name:string;url?:string|null}};
 export type DecisionConfidence={dealerAvailability:{active:number;responsive:number;fastestResponseHours:number|null;label:string};buyerSignals:{saved:number;compared:number;enquired:number;disclaimer:string};reviews:{status:string;label:string}};
 export type PreownedAssessment={allInCost:{askingPrice:number;transfer:number;inspection:number;immediateRepairs:number;plannedUpgrades:number;total:number;disclaimer:string};evidence:{verified:string[];missing:string[];failed:string[]};riskLevel:'Lower'|'Medium'|'High';worthInspecting:boolean;decision:string;nextChecks:string[]};
 export type OwnerRequest={id:string;status:string};
@@ -102,6 +105,7 @@ export const saveProviderVehicle = (vehicle:Recommendation) => request('saved-ve
 export const removeProviderVehicle = (vehicleId:string) => request('saved-vehicles','DELETE',{provider:'lets-pick-my-car',vehicleId});
 export const getDecisionConfidence = (city:string) => request<DecisionConfidence>('decision-confidence?city='+encodeURIComponent(city));
 export const recordComparison = (vehicleId:string) => request('interactions','POST',{vehicleId,action:'compared'});
+export const getProviderComparison = (input:{city:string;variants:{carId:string;variantId:string}[]}) => request<ProviderComparison>('provider-comparisons','POST',input);
 export const assessPreowned = (input:{askingPrice:number;transferCost?:number;inspectionCost?:number;immediateRepairCost?:number;upgradeCost?:number;checks:Record<string,'verified'|'reported'|'missing'|'failed'>}) => request<PreownedAssessment>('preowned/assess','POST',input);
 export const createOwnerRequest = (input:{packageId:string;make:string;model:string;year:number;variant:string;items:string[];noWiringCuts:boolean;email:string;city:string}) => request<OwnerRequest>('owner-requests','POST',input);
 
