@@ -1,0 +1,14 @@
+{
+  "name": "motorform-platform",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build:worker": "node worker/build.mjs",
+    "check:worker": "node --check worker/index.mjs && npm run build:worker && node --check dist/server/index.js",
+    "db:migrate": "wrangler d1 migrations apply motorform-production --remote",
+    "deploy": "npm run build:worker && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

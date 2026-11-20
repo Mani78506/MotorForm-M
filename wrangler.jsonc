@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "motorform-api",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-11-20",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "motorform-production",
+      "database_id": "fcde1700-ca1d-4e10-8079-a263da96c134",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

@@ -31,3 +31,7 @@ The app uses a per-installation identity kept in SecureStore for saved cars and 
 For a production build, set `EXPO_PUBLIC_API_BASE` to the deployed Worker HTTPS
 origin. It is public configuration; never place `PMC_API_KEY` in the mobile app.
 See the repository's `DEPLOYMENT.md` for the release sequence.
+
+For this live MotorForm deployment, the local `mobile/.env` already points at the
+production Worker. Restart Expo with `npx.cmd expo start --tunnel ngrok --clear`
+after pulling the latest source.

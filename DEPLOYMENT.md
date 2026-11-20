@@ -13,13 +13,13 @@ Worker deployment permission. Do not commit provider or operator secrets.
 
 ## Release sequence
 
-1. Apply `drizzle/0000_motorform.sql` through `drizzle/0006_preowned_decisions.sql`
-   in order to the production D1 database.
+1. Install root dependencies with `npm.cmd install`, then apply the checked-in
+   migrations with `npm.cmd run db:migrate`. The production D1 binding is `DB`.
 2. Set Worker secrets in the host secret manager:
    - `PMC_API_KEY` — India catalogue provider key.
    - `MOTORFORM_OPERATOR_KEY` — a new, strong operator-only token.
-3. Deploy the Worker build output from `worker/index.mjs` / `worker/build.mjs` with
-   the D1 binding named `DB`.
+3. Deploy the Worker with `npm.cmd run deploy`. It builds `worker/index.mjs` into
+   `dist/server/index.js` and deploys it with the D1 binding named `DB`.
 4. Verify these production endpoints before releasing mobile:
    - `GET /api/catalog?city=hyderabad`
    - `POST /api/recommendations`

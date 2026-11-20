@@ -325,7 +325,9 @@ async function api(request, env, url, visitor, native) {
     await saveBuyerProfile(db,visitor,input);
     const preferredTransmission=decisionInput(input).transmission;
     const providerInput={budget:input.budget,loc:stateForCity(city.id),price:'onroad',gearbox:preferredTransmission==='automatic'||input.features.includes('automatic')?'auto':preferredTransmission==='manual'?'manual':'open',seats:decisionInput(input).household==='family'?5:4,usage:input.use || 'city',charging:'no'};
-    const result=await cachedPickMyCar(db,env,'recommendations',JSON.stringify(providerInput),'recommendations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(providerInput)});
+    let result=null;
+    try { result=await cachedPickMyCar(db,env,'recommendations',JSON.stringify(providerInput),'recommendations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(providerInput)}); }
+    catch { result=null; }
     if (result) { const items=providerRecommendations(result,input); return json({source:'india_provider',city,items,decisionPaths:archetypes(items),attribution:result.attribution ?? {name:"Let's Pick My Car",url:'https://letspickmycar.com'},datasetRevision:result.datasetRevision ?? null}); }
     const internal=await catalog(db,city.id);
     const params=new URLSearchParams({budget:String(input.budget),use:input.use ?? ''});
