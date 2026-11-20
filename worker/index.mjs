@@ -58,9 +58,50 @@ async function cachedPickMyCar(db, env, resourceType, resourceKey, path, init) {
   await db.prepare('INSERT OR IGNORE INTO provider_snapshots (id,provider_id,resource_type,resource_key,payload_json,source_url,fetched_at,expires_at,content_hash) VALUES (?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),'lets-pick-my-car',resourceType,resourceKey,payload,'https://letspickmycar.com/developers',fetchedAt,expiresAt,cacheHash(payload)).run();
   return publicResult;
 }
-function providerRecommendations(result) {
+function decisionInput(input={}) {
+  return {
+    priority:['value','comfort','features','resale'].includes(input.priority) ? input.priority : 'value',
+    household:['solo','couple','family'].includes(input.household) ? input.household : 'family',
+    transmission:['any','automatic','manual'].includes(input.transmission) ? input.transmission : 'any',
+  };
+}
+function fitExplanation(choice, input, factoryFeatures=[]) {
+  const decision=decisionInput(input);
+  const price=Number(choice.onRoad) || 0;
+  const budget=Number(input.budget) || 0;
+  const headroom=Math.max(0,budget-price);
+  let score=35;
+  const why=[];
+  const watch=[];
+  if (price && budget) {
+    if (price<=budget*.85) { score+=25; why.push('Leaves '+Math.round(headroom/1000)+'k of your on-road budget free'); }
+    else if (price<=budget) { score+=17; why.push('Fits within your stated on-road budget'); }
+    else { score-=35; watch.push('Estimated on-road price exceeds your stated budget'); }
+  }
+  const isAutomatic=/auto|amt|cvt|dct|ivt/i.test(choice.gearbox ?? '');
+  if (decision.transmission==='automatic') {
+    if (isAutomatic) { score+=14; why.push('Matches your automatic-driving preference'); }
+    else { score-=20; watch.push('Manual transmission conflicts with your preference'); }
+  }
+  if (decision.transmission==='manual' && !isAutomatic) { score+=10; why.push('Matches your manual-driving preference'); }
+  if (decision.household==='family') {
+    if ((choice.seats ?? 5)>=5) { score+=10; why.push('Practical five-seat layout for family use'); }
+    else { score-=10; watch.push('Seating capacity may be tight for family use'); }
+  }
+  const labels=[...factoryFeatures,...(choice.highlights ?? [])].join(' ').toLowerCase();
+  const wanted=(input.features ?? []).filter(id=>id==='automatic'||(id==='camera'&&/camera|parking/i.test(labels))||(id==='phone'&&/carplay|android auto|infotainment/i.test(labels)));
+  if (wanted.length) { score+=wanted.length*6; why.push('Includes '+wanted.length+' of your requested features'); }
+  if (decision.priority==='value' && price && budget && price<=budget*.9) { score+=8; why.push('Strong budget headroom for insurance or accessories'); }
+  if (decision.priority==='comfort' && isAutomatic) { score+=6; why.push('Automatic option supports easier daily driving'); }
+  if (decision.priority==='features' && (choice.highlights ?? []).length>=3) { score+=6; why.push('Has a stronger listed feature set'); }
+  if ((choice.limitations ?? []).length) watch.push(choice.limitations[0]);
+  return {fitScore:Math.max(1,Math.min(99,Math.round(score))),whyItFits:why.slice(0,3),watchOuts:watch.slice(0,2),budgetHeadroom:headroom,decisionLabel:score>=75?'Strong fit':score>=55?'Worth a look':'Trade-offs to review'};
+}
+function providerRecommendations(result, input) {
   const data=result?.data ?? result;
-  return (data.items ?? []).map(item=>({
+  return (data.items ?? []).map(item=>{
+    const choice={onRoad:item.onRoad,gearbox:item.transmission,seats:item.seating?.capacity ?? null,highlights:item.highlights ?? [],limitations:item.lacks ?? []};
+    return {
     id:'pmc:'+item.carId+':'+item.variantId,
     providerVariantId:item.variantId,
     modelId:item.carId,
@@ -80,7 +121,12 @@ function providerRecommendations(result) {
     estimatedMonthlyRunningCost:item.estimatedMonthlyRunningCost ?? null,
     estimatedOwnershipCost:item.estimatedOwnershipCost ?? null,
     detailUrl:item.href ?? null,
-  }));
+    ...fitExplanation(choice,input),
+  };}).sort((a,b)=>b.fitScore-a.fitScore || a.onRoad-b.onRoad);
+}
+async function saveBuyerProfile(db, visitor, input) {
+  const preferences=JSON.stringify({budget:input.budget,city:input.city,use:input.use ?? '',features:input.features ?? [],...decisionInput(input)});
+  await db.prepare('INSERT INTO buyer_profiles (visitor,preferences_json,updated_at) VALUES (?,?,?) ON CONFLICT(visitor) DO UPDATE SET preferences_json=excluded.preferences_json,updated_at=excluded.updated_at').bind(visitor,preferences,new Date().toISOString()).run();
 }
 async function enforceRateLimit(db, visitor, scope, limit) {
   const windowStartedAt=Math.floor(Date.now()/60_000)*60_000;
@@ -229,14 +275,20 @@ async function api(request, env, url, visitor, native) {
     const input=await body(request);
     if (!input || !Number.isSafeInteger(input.budget) || input.budget < 300000 || input.budget > 10000000 || !['','city','family','highway'].includes(input.use ?? '') || !Array.isArray(input.features) || !input.features.every(validId)) return json({error:'Invalid recommendation preferences.'},400);
     const city=cityFor(input.city);
-    const providerInput={budget:input.budget,loc:stateForCity(city.id),price:'onroad',gearbox:input.features.includes('automatic')?'auto':'open',seats:5,usage:input.use || 'city',charging:'no'};
+    await saveBuyerProfile(db,visitor,input);
+    const preferredTransmission=decisionInput(input).transmission;
+    const providerInput={budget:input.budget,loc:stateForCity(city.id),price:'onroad',gearbox:preferredTransmission==='automatic'||input.features.includes('automatic')?'auto':preferredTransmission==='manual'?'manual':'open',seats:decisionInput(input).household==='family'?5:4,usage:input.use || 'city',charging:'no'};
     const result=await cachedPickMyCar(db,env,'recommendations',JSON.stringify(providerInput),'recommendations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(providerInput)});
-    if (result) return json({source:'india_provider',city,items:providerRecommendations(result),attribution:result.attribution ?? {name:"Let's Pick My Car",url:'https://letspickmycar.com'},datasetRevision:result.datasetRevision ?? null});
+    if (result) return json({source:'india_provider',city,items:providerRecommendations(result,input),attribution:result.attribution ?? {name:"Let's Pick My Car",url:'https://letspickmycar.com'},datasetRevision:result.datasetRevision ?? null});
     const internal=await catalog(db,city.id);
     const params=new URLSearchParams({budget:String(input.budget),use:input.use ?? ''});
     for (const feature of input.features) params.append('feature',feature);
     const matches=matchCars(internal,params);
-    return json({source:'internal_estimate',city,items:matches.map(match=>{const car=internal.cars.find(item=>item.id===match.id);return {id:car.id,name:car.model+' '+car.trim,onRoad:match.total,fuel:car.fuel,gearbox:car.gearbox,highlights:car.factory.map(key=>internal.features[key].name),limitations:[],sources:[],pricesVerified:car.priceDate,specsVerified:null,dataUpdated:car.priceDate,coverageNote:'MotorForm internal estimated pricing. Confirm final dealer quote.'};}),attribution:{name:'MotorForm internal estimated pricing',url:null}});
+    return json({source:'internal_estimate',city,items:matches.map(match=>{const car=internal.cars.find(item=>item.id===match.id);const choice={onRoad:match.total,gearbox:car.gearbox,seats:5,highlights:car.factory.map(key=>internal.features[key].name),limitations:[]};return {id:car.id,name:car.model+' '+car.trim,onRoad:match.total,fuel:car.fuel,gearbox:car.gearbox,highlights:choice.highlights,limitations:[],sources:[],pricesVerified:car.priceDate,specsVerified:null,dataUpdated:car.priceDate,coverageNote:'MotorForm internal estimated pricing. Confirm final dealer quote.',...fitExplanation(choice,input,car.factory)};}).sort((a,b)=>b.fitScore-a.fitScore || a.onRoad-b.onRoad),attribution:{name:'MotorForm internal estimated pricing',url:null}});
+  }
+  if (pathname === '/api/buyer-profile' && method === 'GET') {
+    const profile=await db.prepare('SELECT preferences_json,updated_at FROM buyer_profiles WHERE visitor=?').bind(visitor).first();
+    return json(profile ? {preferences:JSON.parse(profile.preferences_json),updatedAt:profile.updated_at} : {preferences:null});
   }
   if (pathname === '/api/provider-comparisons' && method === 'POST') {
     await enforceRateLimit(db,visitor,'provider',8);

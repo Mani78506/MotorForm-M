@@ -61,15 +61,18 @@ function Landing({onStart}:{onStart:()=>void}) {
 function Empty({icon,title,detail}:{icon:Icon;title:string;detail:string}) {
   return <View style={s.empty}><Ionicons name={icon} color={blue} size={34}/><Text style={s.heading}>{title}</Text><Text style={[s.small,s.center]}>{detail}</Text></View>;
 }
-function FindScreen({catalog,busy,error,onFind,onCity}:{catalog:Catalog;busy:boolean;error:string;onFind:(budget:number,use:string,features:string[],query:string)=>void;onCity:(id:string)=>void}) {
+function FindScreen({catalog,busy,error,onFind,onCity}:{catalog:Catalog;busy:boolean;error:string;onFind:(budget:number,use:string,features:string[],query:string,decision:{priority:'value'|'comfort'|'features'|'resale';household:'solo'|'couple'|'family';transmission:'any'|'automatic'|'manual'})=>void;onCity:(id:string)=>void}) {
   const [budget,setBudget]=useState(1500000);
   const [use,setUse]=useState('');
   const [query,setQuery]=useState('');
   const [features,setFeatures]=useState<string[]>([]);
+  const [priority,setPriority]=useState<'value'|'comfort'|'features'|'resale'>('value');
+  const [household,setHousehold]=useState<'solo'|'couple'|'family'>('family');
+  const [transmission,setTransmission]=useState<'any'|'automatic'|'manual'>('any');
   return <Frame>
     <View style={s.locationPanel}><View><Text style={s.tiny}>YOUR LOCATION</Text><Text style={s.heading}>{catalog.city.name}, {catalog.city.state}</Text><Text style={s.small}>Internal on-road estimates · not dealer quotes</Text></View><Ionicons name="location" color={blue} size={22}/></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cityList}>{catalog.cities.map(city=><Chip key={city.id} label={city.name} selected={city.id===catalog.city.id} onPress={()=>onCity(city.id)}/>)}</ScrollView>
-    <View style={s.findHero}><Image source={require('./assets/motorform-hero.png')} resizeMode="cover" style={s.findHeroImage}/><View style={s.findHeroShade}/><View style={s.findHeroCopy}><Text style={s.findHeroEyebrow}>MOTORFORM · HYDERABAD</Text><Text style={s.findHeroTitle}>Find a car that fits.</Text><Text style={s.findHeroText}>Prices, features and choices—made simple.</Text></View></View>
+    <View style={s.findHero}><Image source={require('./assets/motorform-hero.png')} resizeMode="cover" style={s.findHeroImage}/><View style={s.findHeroShade}/><View style={s.findHeroCopy}><Text style={s.findHeroEyebrow}>MOTORFORM · INDIA</Text><Text style={s.findHeroTitle}>Find a car that fits.</Text><Text style={s.findHeroText}>A clear shortlist in minutes, not weeks of browser tabs.</Text></View></View>
     <View style={s.panel}><View style={s.split}><Text style={s.heading}>On-road budget</Text><Text style={s.price}>{rupees(budget)}</Text></View>
       <Slider accessibilityLabel="On-road budget" accessibilityValue={{text:rupees(budget)}} minimumValue={500000} maximumValue={3000000} step={50000} value={budget} onValueChange={setBudget} minimumTrackTintColor={blue} maximumTrackTintColor={border} thumbTintColor={navy} style={s.slider}/>
       <View style={s.row}>{[1000000,1500000,2000000,2500000].map(amount=><Chip key={amount} label={'₹'+amount/100000+'L'} selected={budget===amount} onPress={()=>setBudget(amount)}/>)}</View>
@@ -78,9 +81,15 @@ function FindScreen({catalog,busy,error,onFind,onCity}:{catalog:Catalog;busy:boo
     <View style={s.row}>{([{id:'city',label:'City',icon:'business-outline'},{id:'family',label:'Family',icon:'people-outline'},{id:'highway',label:'Highway',icon:'navigate-outline'}] as const).map(item=><Chip key={item.id} label={item.label} icon={item.icon} selected={use===item.id} onPress={()=>setUse(use===item.id?'':item.id)}/>)}</View>
     <Text style={s.heading}>Must-have features</Text>
     <View style={s.row}>{Object.entries(catalog.features).map(([id,feature])=><Chip key={id} label={feature.name} selected={features.includes(id)} onPress={()=>setFeatures(current=>current.includes(id)?current.filter(key=>key!==id):[...current,id])}/>)}</View>
+    <Text style={s.heading}>What matters most?</Text>
+    <View style={s.row}>{([{id:'value',label:'Best value'},{id:'comfort',label:'Easy driving'},{id:'features',label:'More features'},{id:'resale',label:'Resale'}] as const).map(item=><Chip key={item.id} label={item.label} selected={priority===item.id} onPress={()=>setPriority(item.id)}/>)}</View>
+    <Text style={s.heading}>Who is it for?</Text>
+    <View style={s.row}>{([{id:'solo',label:'Just me'},{id:'couple',label:'Two adults'},{id:'family',label:'Family'}] as const).map(item=><Chip key={item.id} label={item.label} selected={household===item.id} onPress={()=>setHousehold(item.id)}/>)}</View>
+    <Text style={s.heading}>Transmission</Text>
+    <View style={s.row}>{([{id:'any',label:'Any'},{id:'automatic',label:'Automatic'},{id:'manual',label:'Manual'}] as const).map(item=><Chip key={item.id} label={item.label} selected={transmission===item.id} onPress={()=>setTransmission(item.id)}/>)}</View>
     <TextInput accessibilityLabel="Search by model or trim" placeholder="Search by model or trim (optional)" placeholderTextColor={muted} autoCorrect={false} maxLength={70} value={query} onChangeText={setQuery} style={s.input}/>
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    <Button label={busy?'Finding matches…':'See my matches'} icon="arrow-forward" disabled={busy} onPress={()=>onFind(budget,use,features,query)}/>
+    <Button label={busy?'Finding matches…':'Build my shortlist'} icon="arrow-forward" disabled={busy} onPress={()=>onFind(budget,use,features,query,{priority,household,transmission})}/>
     {catalog.illustrative&&<Text style={s.small}>Sourced prices where shown. Equipment and upgrade fitment are illustrative.</Text>}
   </Frame>;
 }
@@ -98,7 +107,7 @@ function CarCard({car,total,features,matched,saved,selected,onSave,onCompare,onO
   </View>;
 }
 function RecommendationCard({item,attribution,saved,onSave,onEnquire}:{item:Recommendation;attribution:string;saved:boolean;onSave:()=>void;onEnquire:()=>void}) {
-  return <View style={s.card}><View style={s.cardTop}><View style={s.providerThumb}><Ionicons name="car-sport" size={34} color={blue}/></View><View style={s.cardSummary}><Text style={s.heading}>{item.name}</Text><Text style={s.small}>{item.fuel} · {item.gearbox}{item.seats?' · '+item.seats+' seats':''}</Text><View style={s.priceTile}><Text style={s.tiny}>Estimated on-road</Text><Text style={s.price}>{rupees(item.onRoad)}</Text></View></View></View><View style={s.cardBody}><View style={s.row}>{item.highlights.slice(0,3).map(value=><Text style={s.tag} key={value}>{value}</Text>)}</View><Text style={s.small}>{item.pricesVerified?'Prices checked '+item.pricesVerified+'. ':''}{attribution} · confirm final dealer quote.</Text><View style={s.row}><Button secondary label={saved?'Saved':'Save car'} onPress={onSave}/><Button secondary label="Request quote" onPress={onEnquire}/>{item.detailUrl?<Text accessibilityRole="link" onPress={()=>{void Linking.openURL(item.detailUrl!).catch(()=>{});}} style={s.sourceLink}>Sources ↗</Text>:null}</View></View></View>;
+  return <View style={s.card}><View style={s.cardTop}><View style={s.providerThumb}><Ionicons name="car-sport" size={34} color={blue}/></View><View style={s.cardSummary}><Text style={s.heading}>{item.name}</Text><Text style={s.small}>{item.fuel} · {item.gearbox}{item.seats?' · '+item.seats+' seats':''}</Text><View style={s.priceTile}><Text style={s.tiny}>Estimated on-road</Text><Text style={s.price}>{rupees(item.onRoad)}</Text></View></View></View><View style={s.cardBody}>{item.fitScore?<View style={s.fitPanel}><Text style={s.fitScore}>{item.fitScore}% fit</Text><Text style={s.small}>{item.decisionLabel}{item.budgetHeadroom!==undefined?' · '+rupees(item.budgetHeadroom)+' headroom':''}</Text></View>:null}{item.whyItFits?.map(reason=><Text key={reason} style={s.small}>✓ {reason}</Text>)}{item.watchOuts?.map(reason=><Text key={reason} style={s.watchOut}>! {reason}</Text>)}<View style={s.row}>{item.highlights.slice(0,3).map(value=><Text style={s.tag} key={value}>{value}</Text>)}</View><Text style={s.small}>{item.pricesVerified?'Prices checked '+item.pricesVerified+'. ':''}{attribution} · confirm final dealer quote.</Text><View style={s.row}><Button secondary label={saved?'Saved':'Save car'} onPress={onSave}/><Button secondary label="Request quote" onPress={onEnquire}/>{item.detailUrl?<Text accessibilityRole="link" onPress={()=>{void Linking.openURL(item.detailUrl!).catch(()=>{});}} style={s.sourceLink}>Sources ↗</Text>:null}</View></View></View>;
 }
 function ProviderEnquire({item,city,onDone}:{item:Recommendation;city:string;onDone:()=>void}) {
   const [purpose,setPurpose]=useState<'quote'|'test-drive'>('test-drive');const [email,setEmail]=useState('');const [pending,setPending]=useState(false);const [message,setMessage]=useState('');
@@ -201,12 +210,12 @@ function MotorForm() {
   useEffect(()=>{void load();},[load]);
   if (!catalog) return <Frame>{error?<><Empty icon="cloud-offline-outline" title="Catalog unavailable" detail={error}/><Button label="Try again" onPress={load}/></>:<ActivityIndicator color={blue}/>}</Frame>;
   const cars=catalog.cars;
-  async function find(budget:number,use:string,features:string[],query:string,after:()=>void) {
+  async function find(budget:number,use:string,features:string[],query:string,decision:{priority:'value'|'comfort'|'features'|'resale';household:'solo'|'couple'|'family';transmission:'any'|'automatic'|'manual'},after:()=>void) {
     if (busy) return;
     setBusy(true);setError('');
     const params=[['city',city],['budget',String(budget)],['use',use],['q',query],...features.map(key=>['feature',key])].map(([key,value])=>key+'='+encodeURIComponent(value)).join('&');
     try {
-      const suggested=await getRecommendations({budget,use,features,city});
+      const suggested=await getRecommendations({budget,use,features,city,...decision});
       setProviderMatches(suggested.items);setRecommendationAttribution(suggested.attribution.name);setMatches(undefined);after();
     }
     catch {
@@ -261,7 +270,7 @@ function MotorForm() {
       headerRight:()=> <Pressable accessibilityRole="button" accessibilityLabel="My enquiries" hitSlop={12} onPress={()=>go.navigate('Requests')} style={s.headerAction}><Ionicons name="mail-outline" size={22} color={navy}/></Pressable>,
       tabBarLabelStyle:{fontSize:11,fontWeight:'700'},tabBarStyle:{height:64,paddingTop:5,paddingBottom:7},tabBarIconStyle:{marginTop:1},tabBarIcon:({color,size})=><Ionicons name={icons[route.name]} color={color} size={size}/>,
     })}>
-      <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onCity={setCity} onFind={(budget,use,features,query)=>void find(budget,use,features,query,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
+      <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onCity={setCity} onFind={(budget,use,features,query,decision)=>void find(budget,use,features,query,decision,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
       <Tab.Screen name="Matches" options={{title:'Matches for you',tabBarLabel:'Matches'}}>{({navigation})=><Frame>
         {!!notice&&<Text accessibilityRole="alert" style={s.error}>{notice}</Text>}
         {providerMatches.length ? <><Text style={s.small}>{providerMatches.length} recommended variants · {catalog!.city.name} · {recommendationAttribution}</Text>{providerMatches.map(item=><RecommendationCard key={item.id} item={item} attribution={recommendationAttribution} saved={providerSaved.some(value=>value.id===item.id)} onSave={()=>void saveProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}</> : matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · {catalog!.city.name} · Internal estimates</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
@@ -309,6 +318,7 @@ const s=StyleSheet.create({
   split:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},row:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:7},
   slider:{width:'100%',height:38},
   price:{color:navy,fontSize:16,fontWeight:'800'},priceTile:{backgroundColor:'#DDEEFF',borderRadius:8,paddingHorizontal:8,paddingVertical:5},
+  fitPanel:{backgroundColor:'#E8F4EC',borderRadius:10,padding:9,gap:2},fitScore:{color:'#175D35',fontSize:16,fontWeight:'900'},watchOut:{color:'#8A4B08',fontSize:13,lineHeight:19},
   button:{flexDirection:'row',justifyContent:'center',alignItems:'center',minHeight:45,gap:6,borderRadius:10,backgroundColor:navy,paddingHorizontal:11,paddingVertical:9},
   buttonText:{fontSize:13,fontWeight:'800',color:'#FFF'},secondary:{backgroundColor:'#FFF',borderWidth:1,borderColor:border},secondaryText:{color:blue},
   disabled:{opacity:.55},
