@@ -1,21 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StatusBar, Linking, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StatusBar, Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NavigationContainer, NavigatorScreenParams, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
-import { Catalog, Car, Enquiry, Match, request, onRoad, rupees } from './api';
+import { Catalog, Car, Enquiry, Match, Recommendation, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, loadCatalog, offlineMatches, onRoad, rupees } from './api';
 
 const navy='#102643', ink='#10213A', blue='#1C5CA8', muted='#4B5D75', border='#D9E3EF';
 type Icon=React.ComponentProps<typeof Ionicons>['name'];
-type Tabs={ Find:undefined; Matches:undefined; Compare:undefined; Saved:undefined; Requests:undefined };
-type Stack={ Home:NavigatorScreenParams<Tabs> | undefined; Details:{id:string}; Enquire:{id:string; upgrades:string[]} };
+type Tabs={ Find:undefined; Matches:undefined; Compare:undefined; Saved:undefined };
+type Stack={ Landing:undefined; Home:NavigatorScreenParams<Tabs> | undefined; Details:{id:string}; Enquire:{id:string; upgrades:string[]}; ProviderEnquire:{item:Recommendation;city:string}; Requests:undefined };
 const Tab=createBottomTabNavigator<Tabs>();
 const Root=createNativeStackNavigator<Stack>();
 type Go=NativeStackScreenProps<Stack,'Home'>['navigation'];
-const icons:Record<keyof Tabs,Icon>={Find:'search-outline',Matches:'car-sport-outline',Compare:'swap-horizontal-outline',Saved:'heart-outline',Requests:'mail-outline'};
+const icons:Record<keyof Tabs,Icon>={Find:'search-outline',Matches:'car-sport-outline',Compare:'swap-horizontal-outline',Saved:'heart-outline'};
 const images:Record<string,ImageSourcePropType>={
   'Maruti Suzuki Swift':require('./assets/swift.webp'),
   'Maruti Suzuki Baleno':require('./assets/baleno.webp'),
@@ -36,21 +36,40 @@ function Chip({label,selected,onPress,icon}:{label:string;selected:boolean;onPre
     {icon&&<Ionicons name={icon} size={18} color={blue}/>}<Text style={s.chipText}>{label}</Text>
   </Pressable>;
 }
-function Photo({car,compact=false}:{car:Car;compact?:boolean}) {
+function Photo({car,variant='full'}:{car:Car;variant?:'full'|'card'|'compare'}) {
   const image=images[car.model];
-  return image ? <Image accessibilityLabel={car.model+' model reference'} source={image} style={[s.photo,compact&&s.thumbnail]}/>
-    : <View style={[s.noPhoto,compact&&s.thumbnail]}><Ionicons name="car-outline" size={29} color={muted}/><Text style={s.small}>Photo unavailable</Text></View>;
+  const imageStyle=[s.photo,variant==='card'&&s.cardPhoto,variant==='compare'&&s.thumbnail];
+  return image ? <Image accessibilityLabel={car.model+' model reference'} source={image} resizeMode="cover" style={imageStyle}/>
+    : <View style={[s.noPhoto,variant==='card'&&s.cardPhoto,variant==='compare'&&s.thumbnail]}><Ionicons name="car-outline" size={29} color={muted}/><Text style={s.small}>Photo unavailable</Text></View>;
+}
+function Landing({onStart}:{onStart:()=>void}) {
+  const textIn=useRef(new Animated.Value(0)).current;
+  const carIn=useRef(new Animated.Value(0)).current;
+  useEffect(()=>{Animated.parallel([
+    Animated.timing(textIn,{toValue:1,duration:520,useNativeDriver:true}),
+    Animated.timing(carIn,{toValue:1,duration:760,useNativeDriver:true}),
+  ]).start();},[carIn,textIn]);
+  const textStyle={opacity:textIn,transform:[{translateY:textIn.interpolate({inputRange:[0,1],outputRange:[20,0]})}]};
+  const carStyle={opacity:carIn,transform:[{translateY:carIn.interpolate({inputRange:[0,1],outputRange:[45,0]})},{scale:carIn.interpolate({inputRange:[0,1],outputRange:[1.05,1]})}]};
+  return <View style={s.launch}><Animated.Image source={require('./assets/launch-hero.png')} resizeMode="cover" style={[s.launchImage,carStyle]}/><View style={s.launchShade}/><SafeAreaView style={s.launchSafe} edges={['top','bottom']}>
+    <Animated.View style={[s.launchContent,textStyle]}><View style={s.launchBrand}><View style={s.launchMark}><Text style={s.launchMarkText}>M</Text></View><Text style={s.launchName}>MOTORFORM.</Text><View style={s.launchCity}><View style={s.liveDot}/><Text style={s.launchCityText}>HYDERABAD</Text></View></View>
+      <View style={s.launchMessage}><Text style={s.launchKicker}>INDIA · ESTIMATED PRICING</Text><Text style={s.launchTitle}>Find the right car.{"\n"}<Text style={s.launchAccent}>Make it yours.</Text></Text><Text style={s.launchSubtitle}>Compare variants, check city-based on-road estimates, and explore upgrades before you buy.</Text></View>
+      <View style={s.launchAction}><Pressable accessibilityRole="button" accessibilityLabel="Explore MotorForm" onPress={onStart} style={s.launchButton}><Text style={s.launchButtonText}>Explore MotorForm</Text><Ionicons name="arrow-forward" size={21} color={navy}/></Pressable><Text style={s.launchFootnote}>No account needed · Takes about a minute</Text></View>
+    </Animated.View>
+  </SafeAreaView></View>;
 }
 function Empty({icon,title,detail}:{icon:Icon;title:string;detail:string}) {
   return <View style={s.empty}><Ionicons name={icon} color={blue} size={34}/><Text style={s.heading}>{title}</Text><Text style={[s.small,s.center]}>{detail}</Text></View>;
 }
-function FindScreen({catalog,busy,error,onFind}:{catalog:Catalog;busy:boolean;error:string;onFind:(budget:number,use:string,features:string[],query:string)=>void}) {
+function FindScreen({catalog,busy,error,onFind,onCity}:{catalog:Catalog;busy:boolean;error:string;onFind:(budget:number,use:string,features:string[],query:string)=>void;onCity:(id:string)=>void}) {
   const [budget,setBudget]=useState(1500000);
   const [use,setUse]=useState('');
   const [query,setQuery]=useState('');
   const [features,setFeatures]=useState<string[]>([]);
   return <Frame>
-    <View style={s.hero}><Image source={require('./assets/car.webp')} style={s.photo}/><View style={s.city}><Ionicons name="location-outline" size={15} color={blue}/><Text style={s.chipText}>Hyderabad</Text></View></View>
+    <View style={s.locationPanel}><View><Text style={s.tiny}>YOUR LOCATION</Text><Text style={s.heading}>{catalog.city.name}, {catalog.city.state}</Text><Text style={s.small}>Internal on-road estimates · not dealer quotes</Text></View><Ionicons name="location" color={blue} size={22}/></View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cityList}>{catalog.cities.map(city=><Chip key={city.id} label={city.name} selected={city.id===catalog.city.id} onPress={()=>onCity(city.id)}/>)}</ScrollView>
+    <View style={s.findHero}><Image source={require('./assets/motorform-hero.png')} resizeMode="cover" style={s.findHeroImage}/><View style={s.findHeroShade}/><View style={s.findHeroCopy}><Text style={s.findHeroEyebrow}>MOTORFORM · HYDERABAD</Text><Text style={s.findHeroTitle}>Find a car that fits.</Text><Text style={s.findHeroText}>Prices, features and choices—made simple.</Text></View></View>
     <View style={s.panel}><View style={s.split}><Text style={s.heading}>On-road budget</Text><Text style={s.price}>{rupees(budget)}</Text></View>
       <Slider accessibilityLabel="On-road budget" accessibilityValue={{text:rupees(budget)}} minimumValue={500000} maximumValue={3000000} step={50000} value={budget} onValueChange={setBudget} minimumTrackTintColor={blue} maximumTrackTintColor={border} thumbTintColor={navy} style={s.slider}/>
       <View style={s.row}>{[1000000,1500000,2000000,2500000].map(amount=><Chip key={amount} label={'₹'+amount/100000+'L'} selected={budget===amount} onPress={()=>setBudget(amount)}/>)}</View>
@@ -67,13 +86,24 @@ function FindScreen({catalog,busy,error,onFind}:{catalog:Catalog;busy:boolean;er
 }
 function CarCard({car,total,features,matched,saved,selected,onSave,onCompare,onOpen}:{car:Car;total:number;features:Catalog['features'];matched:Match|undefined;saved:boolean;selected:boolean;onSave:()=>void;onCompare:()=>void;onOpen:()=>void}) {
   return <View style={s.card}>
-    <Pressable accessibilityRole="button" accessibilityLabel={'View '+car.model+' details'} onPress={onOpen}><Photo car={car}/></Pressable>
+    <View style={s.cardTop}>
+      <Pressable accessibilityRole="button" accessibilityLabel={'View '+car.model+' details'} onPress={onOpen}><Photo car={car} variant="card"/></Pressable>
+      <View style={s.cardSummary}><Text style={s.heading}>{car.model}</Text><Text style={s.small}>{car.trim} · {car.gearbox}</Text><View style={s.priceTile}><Text style={s.tiny}>On-road est.</Text><Text style={s.price}>{rupees(total)}</Text></View></View>
+    </View>
     <Pressable accessibilityRole="button" accessibilityLabel={saved?'Remove saved car':'Save car'} accessibilityState={{selected:saved}} style={s.heart} onPress={onSave}><Ionicons name={saved?'heart':'heart-outline'} size={23} color={saved?'#A61B52':navy}/></Pressable>
-    <View style={s.cardBody}><View style={s.split}><View style={s.flex}><Text style={s.heading}>{car.model}</Text><Text style={s.small}>{car.trim} · {car.gearbox}</Text></View><View style={s.priceTile}><Text style={s.tiny}>On-road est.</Text><Text style={s.price}>{rupees(total)}</Text></View></View>
+    <View style={s.cardBody}>
       <View style={s.row}>{car.factory.slice(0,3).map(key=><Text style={s.tag} key={key}>✓ {features[key].name}</Text>)}{matched?.upgrades.map(key=><Text style={s.tag} key={key}>{features[key].name} · Check fitment</Text>)}</View>
       <View style={s.row}><Button secondary label="View details" onPress={onOpen}/><Button secondary label={selected?'✓ Added':'Add to compare'} onPress={onCompare}/></View>
     </View>
   </View>;
+}
+function RecommendationCard({item,attribution,saved,onSave,onEnquire}:{item:Recommendation;attribution:string;saved:boolean;onSave:()=>void;onEnquire:()=>void}) {
+  return <View style={s.card}><View style={s.cardTop}><View style={s.providerThumb}><Ionicons name="car-sport" size={34} color={blue}/></View><View style={s.cardSummary}><Text style={s.heading}>{item.name}</Text><Text style={s.small}>{item.fuel} · {item.gearbox}{item.seats?' · '+item.seats+' seats':''}</Text><View style={s.priceTile}><Text style={s.tiny}>Estimated on-road</Text><Text style={s.price}>{rupees(item.onRoad)}</Text></View></View></View><View style={s.cardBody}><View style={s.row}>{item.highlights.slice(0,3).map(value=><Text style={s.tag} key={value}>{value}</Text>)}</View><Text style={s.small}>{item.pricesVerified?'Prices checked '+item.pricesVerified+'. ':''}{attribution} · confirm final dealer quote.</Text><View style={s.row}><Button secondary label={saved?'Saved':'Save car'} onPress={onSave}/><Button secondary label="Request quote" onPress={onEnquire}/>{item.detailUrl?<Text accessibilityRole="link" onPress={()=>{void Linking.openURL(item.detailUrl!).catch(()=>{});}} style={s.sourceLink}>Sources ↗</Text>:null}</View></View></View>;
+}
+function ProviderEnquire({item,city,onDone}:{item:Recommendation;city:string;onDone:()=>void}) {
+  const [purpose,setPurpose]=useState<'quote'|'test-drive'>('test-drive');const [email,setEmail]=useState('');const [pending,setPending]=useState(false);const [message,setMessage]=useState('');
+  async function submit(){if(!/^\S+@[^\s@]+\.[^\s@]+$/.test(email.trim()))return setMessage('Enter a valid email address.');setPending(true);setMessage('');try{await request('enquiries','POST',{variant:item.id,provider:'lets-pick-my-car',providerVariantId:item.providerVariantId,title:item.name,city,purpose,email:email.trim(),upgrades:[]});onDone();}catch(error){setMessage(error instanceof Error?error.message:'Could not send the enquiry.');}finally{setPending(false);}}
+  return <Frame><Text style={s.title}>{item.name}</Text><Text style={s.small}>{rupees(item.onRoad)} estimated on-road · {city}</Text><View style={s.row}><Chip label="Test drive" selected={purpose==='test-drive'} onPress={()=>setPurpose('test-drive')}/><Chip label="On-road quote" selected={purpose==='quote'} onPress={()=>setPurpose('quote')}/></View><TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="Email address" placeholderTextColor={muted} style={s.input}/><Text style={s.small}>MotorForm records this request and a dealer confirms availability and final pricing.</Text>{message?<Text style={s.error}>{message}</Text>:null}<Button disabled={pending} label={pending?'Sending…':'Send request'} onPress={()=>void submit()}/></Frame>;
 }
 function Details({car,catalog,onEnquire,selected,saved,onSave,onCompare}:{car:Car;catalog:Catalog;selected:boolean;saved:boolean;onSave:()=>void;onCompare:()=>void;onEnquire:()=>void}) {
   return <Frame><View style={s.card}><Photo car={car}/><View style={s.cardBody}>
@@ -101,7 +131,7 @@ function Requests({revision}:{revision:number}) {
   },[revision]));
   return <Frame>{state==='loading'?<ActivityIndicator color={blue}/>:state==='error'?<Empty icon="cloud-offline-outline" title="Requests unavailable" detail="Return to this screen to try again."/>:items.length?items.map(item=><View style={s.panel} key={item.id}><Text style={s.heading}>{item.title}</Text><Text style={s.small}>{item.purpose==='quote'?'On-road quote':'Test drive'}</Text><Text style={s.tag}>{item.status==='received'?'Received by MotorForm':item.status}</Text></View>):<Empty icon="mail-outline" title="No enquiries yet" detail="Find a car and request a quote or test drive."/>}</Frame>;
 }
-function Enquire({id,upgrades,car,onDone}:{id:string;upgrades:string[];car:Car;onDone:()=>void}) {
+function Enquire({id,upgrades,car,city,onDone}:{id:string;upgrades:string[];car:Car;city:string;onDone:()=>void}) {
   const [purpose,setPurpose]=useState<'quote'|'test-drive'>('test-drive');
   const [email,setEmail]=useState('');
   const [pending,setPending]=useState(false);
@@ -113,7 +143,7 @@ function Enquire({id,upgrades,car,onDone}:{id:string;upgrades:string[];car:Car;o
     setPending(true);
     setMessage('');
     try {
-      const value=await request<{id:string}>('enquiries','POST',{variant:id,purpose,email:email.trim(),upgrades});
+      const value=await request<{id:string}>('enquiries','POST',{variant:id,purpose,email:email.trim(),upgrades,city});
       setReceipt(value.id.slice(0,8).toUpperCase());
     } catch (error) { setMessage(error instanceof Error?error.message:'Could not send the enquiry.'); }
     finally { setPending(false); }
@@ -135,7 +165,7 @@ function Compare({cars,catalog,upgrades,toggle,onEnquire}:{cars:Car[];catalog:Ca
   const featureRows=Object.entries(catalog.features);
   return <Frame>
     <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled><View style={s.compareTable}>
-      <View style={s.compareRow}>{cars.map((car,index)=><View style={{width:cellWidth,gap:6}} key={car.id}><Photo car={car} compact/><Text style={s.bold}>{car.model}</Text><Text style={s.small}>{car.trim}</Text><Text style={s.price}>{rupees(totals[index])}</Text><Text style={s.tiny}>On-road est. with upgrades</Text><View style={s.bar}><View style={[s.barFill,{width:`${Math.round(totals[index]/Math.max(1,...totals)*100)}%`}]}/></View></View>)}</View>
+      <View style={s.compareRow}>{cars.map((car,index)=><View style={{width:cellWidth,gap:6}} key={car.id}><Photo car={car} variant="compare"/><Text style={s.bold}>{car.model}</Text><Text style={s.small}>{car.trim}</Text><Text style={s.price}>{rupees(totals[index])}</Text><Text style={s.tiny}>On-road est. with upgrades</Text><View style={s.bar}><View style={[s.barFill,{width:`${Math.round(totals[index]/Math.max(1,...totals)*100)}%`}]}/></View></View>)}</View>
       {featureRows.map(([key,feature])=><View style={s.compareFeature} key={key}><Text style={s.bold}>{feature.name}</Text><View style={s.compareRow}>{cars.map(car=><View key={car.id} style={{width:cellWidth,alignItems:'flex-start'}}>{car.factory.includes(key)?<Text style={s.factory}>✓ Factory</Text>:car.options.includes(key)?<Chip label={(upgrades[car.id]??[]).includes(key)?'✓ '+rupees(feature.cost??0):'+ '+rupees(feature.cost??0)} selected={(upgrades[car.id]??[]).includes(key)} onPress={()=>toggle(car.id,key)}/>:<Text style={s.tag}>Unconfirmed</Text>}</View>)}</View></View>)}
       <View style={s.compareRow}>{cars.map(car=><View style={{width:cellWidth}} key={car.id}><Button label="Enquire" secondary onPress={()=>onEnquire(car)}/></View>)}</View>
     </View></ScrollView>
@@ -145,10 +175,14 @@ function Compare({cars,catalog,upgrades,toggle,onEnquire}:{cars:Car[];catalog:Ca
 
 function MotorForm() {
   const [catalog,setCatalog]=useState<Catalog>();
+  const [city,setCity]=useState('hyderabad');
   const [saved,setSaved]=useState<string[]>([]);
   const [compare,setCompare]=useState<string[]>([]);
   const [upgrades,setUpgrades]=useState<Record<string,string[]>>({});
   const [matches,setMatches]=useState<Match[]>();
+  const [providerMatches,setProviderMatches]=useState<Recommendation[]>([]);
+  const [providerSaved,setProviderSaved]=useState<Recommendation[]>([]);
+  const [recommendationAttribution,setRecommendationAttribution]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -157,21 +191,28 @@ function MotorForm() {
   const load=useCallback(async()=>{
     setError('');
     try {
-      const data=await request<Catalog>('catalog');
+      const {catalog:data,offline}=await loadCatalog(city);
       setCatalog(data);
-      try { setSaved(await request<string[]>('shortlist')); }
+      if (offline) setNotice('You are browsing the built-in catalog. Connect to the internet to save cars or send enquiries.');
+      try { setSaved(await request<string[]>('shortlist'));setProviderSaved(await getSavedProviderVehicles()); }
       catch { setNotice('Saved cars are unavailable. Reopen the app to retry.'); }
     } catch { setError('Could not load the catalog. Check your connection and try again.'); }
-  },[]);
+  },[city]);
   useEffect(()=>{void load();},[load]);
   if (!catalog) return <Frame>{error?<><Empty icon="cloud-offline-outline" title="Catalog unavailable" detail={error}/><Button label="Try again" onPress={load}/></>:<ActivityIndicator color={blue}/>}</Frame>;
   const cars=catalog.cars;
   async function find(budget:number,use:string,features:string[],query:string,after:()=>void) {
     if (busy) return;
     setBusy(true);setError('');
-    const params=[['budget',String(budget)],['use',use],['q',query],...features.map(key=>['feature',key])].map(([key,value])=>key+'='+encodeURIComponent(value)).join('&');
-    try { setMatches(await request<Match[]>('matches?'+params)); after(); }
-    catch { setError('Could not find matches. Try again.'); }
+    const params=[['city',city],['budget',String(budget)],['use',use],['q',query],...features.map(key=>['feature',key])].map(([key,value])=>key+'='+encodeURIComponent(value)).join('&');
+    try {
+      const suggested=await getRecommendations({budget,use,features,city});
+      setProviderMatches(suggested.items);setRecommendationAttribution(suggested.attribution.name);setMatches(undefined);after();
+    }
+    catch {
+      try { setMatches(await request<Match[]>('matches?'+params));setProviderMatches([]); after(); }
+      catch { setMatches(offlineMatches(catalog!,budget,use,features,query));setProviderMatches([]);setNotice('Showing matches from the built-in catalog. Connect to the internet for live pricing.');after(); }
+    }
     finally { setBusy(false); }
   }
   async function save(id:string) {
@@ -183,6 +224,13 @@ function MotorForm() {
       setSaved(current=>next?[...current,id]:current.filter(key=>key!==id));
     } catch { setNotice('Could not update saved cars. Try again.'); }
     finally { setSaving(undefined); }
+  }
+  async function saveProvider(item:Recommendation) {
+    const exists=providerSaved.some(value=>value.id===item.id);
+    try {
+      if (exists) { await removeProviderVehicle(item.id);setProviderSaved(current=>current.filter(value=>value.id!==item.id)); }
+      else { await saveProviderVehicle(item);setProviderSaved(current=>[item,...current]); }
+    } catch { setNotice('Could not update saved cars. Try again.'); }
   }
   function select(car:Car) {
     setNotice('');
@@ -200,6 +248,7 @@ function MotorForm() {
   function openEnquiry(go:Go,car:Car) {
     go.navigate('Enquire',{id:car.id,upgrades:upgrades[car.id]??matches?.find(match=>match.id===car.id)?.upgrades??[]});
   }
+  function openProviderEnquiry(go:Go,item:Recommendation) { go.navigate('ProviderEnquire',{item,city:catalog!.city.id}); }
   function list(go:Go,items:Car[],withEstimates:boolean) {
     return items.map(car=>{
       const match=withEstimates?matches?.find(item=>item.id===car.id):undefined;
@@ -208,13 +257,14 @@ function MotorForm() {
   }
   function renderTabs(go:Go) {
     return <Tab.Navigator screenOptions={({route})=>({
-      headerTitleStyle:{color:ink,fontWeight:'800'},headerShadowVisible:false,tabBarActiveTintColor:blue,tabBarInactiveTintColor:muted,
-      tabBarLabelStyle:{fontSize:11,fontWeight:'700'},tabBarIcon:({color,size})=><Ionicons name={icons[route.name]} color={color} size={size}/>,
+      headerTitleStyle:{color:ink,fontWeight:'800',fontSize:20},headerShadowVisible:false,tabBarActiveTintColor:blue,tabBarInactiveTintColor:muted,
+      headerRight:()=> <Pressable accessibilityRole="button" accessibilityLabel="My enquiries" hitSlop={12} onPress={()=>go.navigate('Requests')} style={s.headerAction}><Ionicons name="mail-outline" size={22} color={navy}/></Pressable>,
+      tabBarLabelStyle:{fontSize:11,fontWeight:'700'},tabBarStyle:{height:64,paddingTop:5,paddingBottom:7},tabBarIconStyle:{marginTop:1},tabBarIcon:({color,size})=><Ionicons name={icons[route.name]} color={color} size={size}/>,
     })}>
-      <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onFind={(budget,use,features,query)=>void find(budget,use,features,query,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
+      <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onCity={setCity} onFind={(budget,use,features,query)=>void find(budget,use,features,query,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
       <Tab.Screen name="Matches" options={{title:'Matches for you',tabBarLabel:'Matches'}}>{({navigation})=><Frame>
         {!!notice&&<Text accessibilityRole="alert" style={s.error}>{notice}</Text>}
-        {matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · Hyderabad{catalog!.illustrative?' · Estimates':''}</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
+        {providerMatches.length ? <><Text style={s.small}>{providerMatches.length} recommended variants · {catalog!.city.name} · {recommendationAttribution}</Text>{providerMatches.map(item=><RecommendationCard key={item.id} item={item} attribution={recommendationAttribution} saved={providerSaved.some(value=>value.id===item.id)} onSave={()=>void saveProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}</> : matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · {catalog!.city.name} · Internal estimates</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
         {list(go,(matches??[]).flatMap(match=>cars.filter(car=>car.id===match.id)),true)}
         {compare.length>0&&<Button label={'Compare ('+compare.length+')'} icon="swap-horizontal-outline" onPress={()=>navigation.navigate('Compare')}/>}
         <Button label="Edit preferences" secondary onPress={()=>navigation.navigate('Find')}/>
@@ -222,12 +272,12 @@ function MotorForm() {
       <Tab.Screen name="Compare" options={{title:'Compare variants',tabBarLabel:'Compare'}}>{()=><Compare cars={compare.flatMap(id=>cars.filter(car=>car.id===id))} catalog={catalog!} upgrades={upgrades} toggle={toggle} onEnquire={car=>openEnquiry(go,car)}/>}</Tab.Screen>
       <Tab.Screen name="Saved" options={{title:'Saved cars',tabBarLabel:'Saved'}}>{()=> <Frame>
         {!!notice&&<Text accessibilityRole="alert" style={s.error}>{notice}</Text>}
-        {saved.length?list(go,cars.filter(car=>saved.includes(car.id)),false):<Empty icon="heart-outline" title="No saved cars" detail="Tap the heart on a match to keep it here."/>}
+        {saved.length?list(go,cars.filter(car=>saved.includes(car.id)),false):null}{providerSaved.map(item=><RecommendationCard key={item.id} item={item} attribution="Let's Pick My Car" saved onSave={()=>void saveProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}{!saved.length&&!providerSaved.length?<Empty icon="heart-outline" title="No saved cars" detail="Tap Save on a recommendation to keep it here."/>:null}
       </Frame>}</Tab.Screen>
-      <Tab.Screen name="Requests" options={{title:'My enquiries',tabBarLabel:'Requests'}}>{()=><Requests revision={revision}/>}</Tab.Screen>
     </Tab.Navigator>;
   }
-  return <Root.Navigator screenOptions={{headerTitleStyle:{color:ink,fontWeight:'800'},headerTintColor:navy}}>
+  return <Root.Navigator initialRouteName="Landing" screenOptions={{headerTitleStyle:{color:ink,fontWeight:'800'},headerTintColor:navy}}>
+    <Root.Screen name="Landing" options={{headerShown:false}}>{({navigation})=><Landing onStart={()=>navigation.replace('Home')}/>}</Root.Screen>
     <Root.Screen name="Home" options={{headerShown:false}}>{props=>renderTabs(props.navigation)}</Root.Screen>
     <Root.Screen name="Details" options={{title:'Car details'}}>{({route,navigation})=>{
       const car=cars.find(item=>item.id===route.params.id);
@@ -235,23 +285,27 @@ function MotorForm() {
     }}</Root.Screen>
     <Root.Screen name="Enquire" options={{title:'Dealer enquiry'}}>{({route,navigation})=>{
       const car=cars.find(item=>item.id===route.params.id);
-      return car?<Enquire {...route.params} car={car} onDone={()=>{setRevision(value=>value+1);navigation.popTo('Home',{screen:'Requests'});}}/>:<Frame><Empty icon="car-outline" title="Variant unavailable" detail="Return to Matches to choose another car."/></Frame>;
+      return car?<Enquire {...route.params} car={car} city={catalog.city.id} onDone={()=>{setRevision(value=>value+1);navigation.popTo('Home',{screen:'Requests'});}}/>:<Frame><Empty icon="car-outline" title="Variant unavailable" detail="Return to Matches to choose another car."/></Frame>;
     }}</Root.Screen>
+    <Root.Screen name="ProviderEnquire" options={{title:'Dealer enquiry'}}>{({route,navigation})=><ProviderEnquire {...route.params} onDone={()=>{setRevision(value=>value+1);navigation.popTo('Home',{screen:'Requests'});}}/>}</Root.Screen>
+    <Root.Screen name="Requests" options={{title:'My enquiries'}}>{()=><Requests revision={revision}/>}</Root.Screen>
   </Root.Navigator>;
 }
 export default function App() {
   return <SafeAreaProvider><StatusBar barStyle="dark-content"/><NavigationContainer><MotorForm/></NavigationContainer></SafeAreaProvider>;
 }
 const s=StyleSheet.create({
-  frame:{flex:1,backgroundColor:'#F3F7FC'},content:{gap:13,padding:16,paddingBottom:28},
-  hero:{borderRadius:18,overflow:'hidden',backgroundColor:navy},
-  city:{position:'absolute',top:12,left:12,flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#FFF',borderRadius:18,paddingVertical:6,paddingHorizontal:9},
-  photo:{width:'100%',aspectRatio:16/9,backgroundColor:'#E4EDF8'},thumbnail:{height:95,aspectRatio:undefined,borderRadius:8},
-  noPhoto:{aspectRatio:16/9,backgroundColor:'#E4EDF8',justifyContent:'center',alignItems:'center',gap:4},
+  frame:{flex:1,backgroundColor:'#F5F7FB'},content:{gap:14,padding:16,paddingBottom:34},
+  launch:{flex:1,backgroundColor:'#020D1E'},launchImage:{...StyleSheet.absoluteFill,width:undefined,height:undefined},launchShade:{...StyleSheet.absoluteFill,backgroundColor:'rgba(1,10,25,.12)'},launchSafe:{flex:1},launchContent:{flex:1,paddingHorizontal:24,paddingTop:14,paddingBottom:12,justifyContent:'space-between'},launchBrand:{flexDirection:'row',alignItems:'center',gap:11},launchMark:{width:42,height:42,borderRadius:12,backgroundColor:'#B9D9FF',alignItems:'center',justifyContent:'center'},launchMarkText:{fontSize:23,fontWeight:'900',fontStyle:'italic',color:navy},launchName:{fontSize:19,letterSpacing:3,fontWeight:'900',color:'#FFF',flex:1},launchCity:{flexDirection:'row',alignItems:'center',gap:5},liveDot:{width:6,height:6,borderRadius:5,backgroundColor:'#8FC5FF'},launchCityText:{fontSize:10,fontWeight:'800',letterSpacing:.8,color:'#B9D9FF'},launchMessage:{marginTop:34,gap:14},launchKicker:{fontSize:12,letterSpacing:2.2,fontWeight:'900',color:'#A7CFFF'},launchTitle:{fontSize:44,lineHeight:48,letterSpacing:-1.5,fontWeight:'900',color:'#FFF'},launchAccent:{color:'#A9D0FF'},launchSubtitle:{fontSize:17,lineHeight:25,color:'#E5EDF8',maxWidth:325},launchAction:{gap:12},launchButton:{height:58,borderRadius:17,backgroundColor:'#B9D9FF',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},launchButtonText:{fontSize:17,fontWeight:'900',color:navy},launchFootnote:{textAlign:'center',fontSize:12,fontWeight:'700',color:'#DBE8F7'},
+  landing:{flex:1,backgroundColor:'#F5F7FB'},landingContent:{flexGrow:1,padding:20,paddingTop:18,gap:18},brandRow:{flexDirection:'row',alignItems:'center',gap:8},brandMark:{width:34,height:34,borderRadius:10,backgroundColor:navy,alignItems:'center',justifyContent:'center'},brand:{color:ink,fontSize:20,fontWeight:'900',flex:1},location:{color:muted,fontSize:12,fontWeight:'700'},
+  landingHero:{height:320,borderRadius:24,overflow:'hidden',backgroundColor:navy,justifyContent:'flex-end'},landingImage:{...StyleSheet.absoluteFill,width:undefined,height:undefined},heroShade:{...StyleSheet.absoluteFill,backgroundColor:'rgba(4,19,42,.27)'},landingCopy:{padding:22,gap:7},overline:{color:'#BCE0FF',fontWeight:'800',fontSize:11,letterSpacing:1.2},landingTitle:{color:'#FFF',fontSize:32,lineHeight:38,fontWeight:'900',maxWidth:260},landingText:{color:'#E3EDF8',fontSize:14,lineHeight:20,maxWidth:260},valueRow:{flexDirection:'row',gap:10},value:{flex:1,backgroundColor:'#FFF',borderColor:border,borderWidth:1,borderRadius:14,padding:13,gap:5},valueTitle:{fontSize:13,color:ink,fontWeight:'800'},valueText:{fontSize:12,color:muted,lineHeight:16},disclaimer:{textAlign:'center',color:muted,fontSize:12,fontWeight:'600'},
+  findHero:{height:176,borderRadius:18,overflow:'hidden',backgroundColor:navy,justifyContent:'flex-end'},findHeroImage:{...StyleSheet.absoluteFill,width:undefined,height:undefined},findHeroShade:{...StyleSheet.absoluteFill,backgroundColor:'rgba(5,20,42,.35)'},findHeroCopy:{padding:16,gap:3},findHeroEyebrow:{color:'#BCE0FF',fontSize:10,fontWeight:'800',letterSpacing:1},findHeroTitle:{color:'#FFF',fontSize:23,fontWeight:'900'},findHeroText:{color:'#EDF5FF',fontSize:13},
+  photo:{width:'100%',height:210,backgroundColor:'#E4EDF8'},cardPhoto:{width:116,height:84,borderRadius:10},thumbnail:{height:95,borderRadius:8},
+  noPhoto:{height:210,backgroundColor:'#E4EDF8',justifyContent:'center',alignItems:'center',gap:4},
   heading:{fontSize:17,fontWeight:'800',color:ink},title:{fontSize:26,fontWeight:'800',color:ink},bold:{fontWeight:'800',color:ink},
   small:{color:muted,fontSize:13,lineHeight:19},tiny:{color:muted,fontSize:10},center:{textAlign:'center'},flex:{flex:1},
   card:{backgroundColor:'#FFF',borderRadius:16,overflow:'hidden',borderWidth:1,borderColor:border},
-  cardBody:{padding:13,gap:10},panel:{backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:13,padding:12,gap:9},
+  cardTop:{flexDirection:'row',gap:12,padding:12,paddingBottom:0},cardSummary:{flex:1,gap:5,paddingRight:32},cardBody:{padding:13,gap:10},panel:{backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:13,padding:12,gap:9},
   split:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},row:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:7},
   slider:{width:'100%',height:38},
   price:{color:navy,fontSize:16,fontWeight:'800'},priceTile:{backgroundColor:'#DDEEFF',borderRadius:8,paddingHorizontal:8,paddingVertical:5},
@@ -261,13 +315,15 @@ const s=StyleSheet.create({
   chip:{flexDirection:'row',alignItems:'center',gap:5,borderWidth:1,borderColor:border,borderRadius:10,backgroundColor:'#FFF',paddingHorizontal:10,paddingVertical:9},
   chipOn:{backgroundColor:'#DCEEFF',borderColor:'#6395CF'},chipText:{fontSize:13,fontWeight:'700',color:ink},
   input:{borderWidth:1,borderColor:border,borderRadius:10,backgroundColor:'#FFF',minHeight:45,paddingHorizontal:12,color:ink},
+  locationPanel:{backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:14,padding:13,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},cityList:{gap:8,paddingRight:16},
+  providerThumb:{width:116,height:84,borderRadius:10,backgroundColor:'#E4EDF8',alignItems:'center',justifyContent:'center'},
   heart:{position:'absolute',right:10,top:10,width:43,height:43,borderRadius:22,backgroundColor:'#FFF',justifyContent:'center',alignItems:'center'},
   tag:{backgroundColor:'#E8F0FA',color:'#294D76',fontWeight:'600',fontSize:11,borderRadius:12,paddingHorizontal:7,paddingVertical:4,alignSelf:'flex-start'},
   factory:{backgroundColor:'#DDF4E4',color:'#1D5530',fontWeight:'700',fontSize:11,borderRadius:12,paddingHorizontal:7,paddingVertical:4,alignSelf:'flex-start'},
   sourceLink:{color:blue,fontSize:13,fontWeight:'700'},
   error:{color:'#9B2637',fontWeight:'700'},empty:{alignItems:'center',gap:8,padding:23,borderRadius:14,backgroundColor:'#FFF',borderWidth:1,borderColor:border},
   featureLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:border,paddingBottom:8},
-  compareTable:{padding:11,backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:12,gap:11},compareRow:{flexDirection:'row',gap:9},
+  headerAction:{paddingHorizontal:16,paddingVertical:6},compareTable:{padding:11,backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:12,gap:11},compareRow:{flexDirection:'row',gap:9},
   compareFeature:{gap:6,paddingTop:8,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:border},bar:{height:7,backgroundColor:'#DEEAF9',borderRadius:5,overflow:'hidden'},
   barFill:{height:7,backgroundColor:blue,borderRadius:5},
 });
