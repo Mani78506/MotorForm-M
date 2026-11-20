@@ -6,7 +6,7 @@ import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navig
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
-import { Catalog, Car, Enquiry, Match, Recommendation, DecisionConfidence, PreownedAssessment, ProviderComparison, ProviderFeature, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, getDecisionConfidence, getProviderComparison, recordComparison, assessPreowned, createOwnerRequest, loadCatalog, offlineMatches, onRoad, rupees } from './api';
+import { Catalog, Car, Enquiry, Match, Recommendation, DecisionConfidence, PreownedAssessment, ProviderComparison, ProviderFeature, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, getDecisionConfidence, getProviderComparison, recordComparison, assessPreowned, createOwnerRequest, loadCatalog, onRoad, rupees } from './api';
 
 const navy='#102643', ink='#10213A', blue='#1C5CA8', muted='#4B5D75', border='#D9E3EF';
 type Icon=React.ComponentProps<typeof Ionicons>['name'];
@@ -260,14 +260,13 @@ function MotorForm() {
   async function find(budget:number,use:string,features:string[],query:string,decision:{priority:'value'|'comfort'|'features'|'resale';household:'solo'|'couple'|'family';transmission:'any'|'automatic'|'manual'},after:()=>void) {
     if (busy) return;
     setBusy(true);setError('');
-    const params=[['city',city],['budget',String(budget)],['use',use],['q',query],...features.map(key=>['feature',key])].map(([key,value])=>key+'='+encodeURIComponent(value)).join('&');
     try {
       const suggested=await getRecommendations({budget,use,features,city,...decision});
-      setProviderMatches(suggested.items);setRecommendationAttribution(suggested.attribution.name);setMatches(undefined);after();
+      setProviderMatches(suggested.items);setRecommendationAttribution(suggested.attribution.name);setMatches(undefined);setNotice('');after();
     }
-    catch {
-      try { setMatches(await request<Match[]>('matches?'+params));setProviderMatches([]); after(); }
-      catch { setMatches(offlineMatches(catalog!,budget,use,features,query));setProviderMatches([]);setNotice('Showing matches from the built-in catalog. Connect to the internet for live pricing.');after(); }
+    catch (failure) {
+      setProviderMatches([]);setMatches(undefined);
+      setError(failure instanceof Error?failure.message:'Live India variants could not load. Check your connection and try again.');
     }
     finally { setBusy(false); }
   }
@@ -328,6 +327,7 @@ function MotorForm() {
       <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onCity={setCity} onFind={(budget,use,features,query,decision)=>void find(budget,use,features,query,decision,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
       <Tab.Screen name="Matches" options={{title:'Matches for you',tabBarLabel:'Matches'}}>{({navigation})=><Frame>
         {!!notice&&<Text accessibilityRole="alert" style={s.error}>{notice}</Text>}
+        {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
         {providerMatches.length ? <><View style={s.confidencePanel}><Text style={s.heading}>Decision confidence</Text><Text style={s.small}>{confidence?.dealerAvailability.label ?? 'Checking local dealer availability…'}</Text><Text style={s.small}>{confidence?.reviews.label ?? 'Verified review coverage is not connected.'}</Text></View><View style={s.liveSource}><View style={s.liveDot}/><Text style={s.liveSourceText}>LIVE INDIA PROVIDER · {providerMatches.length} VARIANTS · {catalog!.city.name.toUpperCase()}</Text></View>{providerMatches.map(item=><RecommendationCard key={item.id} item={item} attribution={recommendationAttribution} saved={providerSaved.some(value=>value.id===item.id)} selected={providerCompare.some(value=>value.id===item.id)} onSave={()=>void saveProvider(item)} onCompare={()=>selectProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}</> : matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · {catalog!.city.name} · Internal estimates</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
         {list(go,(matches??[]).flatMap(match=>cars.filter(car=>car.id===match.id)),true)}
         {(compare.length>0||providerCompare.length>0)&&<Button label={'Compare ('+(providerCompare.length||compare.length)+')'} icon="swap-horizontal-outline" onPress={()=>navigation.navigate('Compare')}/>}
