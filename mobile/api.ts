@@ -14,6 +14,7 @@ export type Enquiry = { id: string; title: string; purpose: 'quote' | 'test-driv
 export type Recommendation = {id:string;providerVariantId?:string;modelId?:string;name:string;onRoad:number;exShowroom?:number;fuel:string;gearbox:string;seats?:number|null;highlights:string[];limitations:string[];sources:{label:string;url:string;kind:string;checkedAt:string}[];pricesVerified?:string|null;specsVerified?:string|null;dataUpdated?:string|null;coverageNote?:string|null;estimatedMonthlyRunningCost?:number|null;estimatedOwnershipCost?:number|null;detailUrl?:string|null;fitScore?:number;whyItFits?:string[];watchOuts?:string[];budgetHeadroom?:number;decisionLabel?:string;ownershipEstimate?:{period:string;fuel:number;service:number;insurance:number;total:number;disclaimer:string};budgetRisk?:'Comfortable'|'Watch spend'|'Stretch'|'Over budget';riskNote?:string};
 export type DecisionConfidence={dealerAvailability:{active:number;responsive:number;fastestResponseHours:number|null;label:string};buyerSignals:{saved:number;compared:number;enquired:number;disclaimer:string};reviews:{status:string;label:string}};
 export type PreownedAssessment={allInCost:{askingPrice:number;transfer:number;inspection:number;immediateRepairs:number;plannedUpgrades:number;total:number;disclaimer:string};evidence:{verified:string[];missing:string[];failed:string[]};riskLevel:'Lower'|'Medium'|'High';worthInspecting:boolean;decision:string;nextChecks:string[]};
+export type OwnerRequest={id:string;status:string};
 export type RecommendationResponse = {source:'india_provider'|'internal_estimate';city:City;items:Recommendation[];decisionPaths?:{bestValue?:string;bestComfort?:string;safeAlternative?:string};attribution:{name:string;url:string|null};datasetRevision?:string|null};
 
 // Every build must use the live nationwide Worker. EXPO_PUBLIC_API_BASE remains
@@ -102,6 +103,7 @@ export const removeProviderVehicle = (vehicleId:string) => request('saved-vehicl
 export const getDecisionConfidence = (city:string) => request<DecisionConfidence>('decision-confidence?city='+encodeURIComponent(city));
 export const recordComparison = (vehicleId:string) => request('interactions','POST',{vehicleId,action:'compared'});
 export const assessPreowned = (input:{askingPrice:number;transferCost?:number;inspectionCost?:number;immediateRepairCost?:number;upgradeCost?:number;checks:Record<string,'verified'|'reported'|'missing'|'failed'>}) => request<PreownedAssessment>('preowned/assess','POST',input);
+export const createOwnerRequest = (input:{packageId:string;make:string;model:string;year:number;variant:string;items:string[];noWiringCuts:boolean;email:string;city:string}) => request<OwnerRequest>('owner-requests','POST',input);
 
 export function offlineMatches(catalog: Catalog, budget: number, use: string, required: string[], query: string): Match[] {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);

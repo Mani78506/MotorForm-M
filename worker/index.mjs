@@ -44,6 +44,23 @@ function cacheHash(value) {
   for (const char of value) { hash^=char.charCodeAt(0); hash=Math.imul(hash,16777619); }
   return (hash>>>0).toString(16);
 }
+const ownerStudioPackages={
+  protect:[
+    {name:'Front-end paint protection film',price:42000,noCuts:true},
+    {name:'Ceramic coating',price:18000,noCuts:true},
+    {name:'Interior fabric protection',price:6500,noCuts:true},
+  ],
+  refresh:[
+    {name:'Cabin deep clean',price:7500,noCuts:true},
+    {name:'Exterior decontamination and polish',price:9500,noCuts:true},
+    {name:'Headlamp restoration',price:3500,noCuts:true},
+  ],
+  modernise:[
+    {name:'CarPlay / Android Auto display',price:18000,noCuts:true},
+    {name:'Reverse camera',price:7500,noCuts:false},
+    {name:'Parking sensor kit',price:5500,noCuts:false},
+  ],
+};
 async function cachedPickMyCar(db, env, resourceType, resourceKey, path, init) {
   const now=new Date();
   const cached=await db.prepare(`SELECT payload_json FROM provider_snapshots WHERE provider_id='lets-pick-my-car' AND resource_type=? AND resource_key=? AND (expires_at IS NULL OR expires_at>?) ORDER BY fetched_at DESC LIMIT 1`).bind(resourceType,resourceKey,now.toISOString()).first();
@@ -490,6 +507,17 @@ async function api(request, env, url, visitor, native) {
       await recordInteraction(db,visitor,input.variant,'enquired');
       return json({id,status:'received'},201);
     }
+  }
+  if (pathname === '/api/owner-requests' && method === 'POST') {
+    const input=await body(request);
+    const packageItems=ownerStudioPackages[input?.packageId];
+    const validRequest=input && packageItems && clean(input.make,80) && clean(input.model,100) && Number.isSafeInteger(input.year) && input.year>=1980 && input.year<=new Date().getFullYear()+1 && clean(input.variant,100) && Array.isArray(input.items) && input.items.length>=1 && input.items.length<=packageItems.length && input.items.every(item=>typeof item==='string') && new Set(input.items).size===input.items.length && typeof input.noWiringCuts==='boolean' && typeof input.email==='string' && input.email.length<=254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email);
+    const selected=validRequest ? packageItems.filter(item=>input.items.includes(item.name)) : [];
+    if (!validRequest || selected.length!==input.items.length || (input.noWiringCuts && selected.some(item=>!item.noCuts))) return json({error:'Complete your vehicle, eligible services and email before requesting a quote.'},400);
+    const estimatedTotal=selected.reduce((sum,item)=>sum+item.price,0);
+    const id=crypto.randomUUID(); const createdAt=new Date().toISOString(); const city=cityFor(input.city);
+    await db.prepare('INSERT INTO owner_requests (id,visitor,package_id,make,model,year,variant,items_json,estimated_total,no_wiring_cuts,email,city_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,visitor,input.packageId,input.make,input.model,input.year,input.variant,JSON.stringify(selected.map(item=>item.name)),estimatedTotal,input.noWiringCuts?1:0,input.email,city.id,createdAt).run();
+    return json({id,status:'received',estimatedTotal},201);
   }
   return json({error:'Endpoint not found.'},404);
 }
