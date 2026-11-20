@@ -97,6 +97,29 @@ function fitExplanation(choice, input, factoryFeatures=[]) {
   if ((choice.limitations ?? []).length) watch.push(choice.limitations[0]);
   return {fitScore:Math.max(1,Math.min(99,Math.round(score))),whyItFits:why.slice(0,3),watchOuts:watch.slice(0,2),budgetHeadroom:headroom,decisionLabel:score>=75?'Strong fit':score>=55?'Worth a look':'Trade-offs to review'};
 }
+function confidenceFor(choice,input) {
+  const price=Number(choice.onRoad)||0;
+  const budget=Number(input.budget)||0;
+  const automatic=/auto|amt|cvt|dct|ivt/i.test(choice.gearbox ?? '');
+  const annualFuel=automatic?62000:58000;
+  const annualService=Math.max(9500,Math.round(price*.012));
+  const annualInsurance=Math.max(16000,Math.round(price*.025));
+  const ownershipYearOne=price+annualFuel+annualService+annualInsurance;
+  const ratio=budget?price/budget:0;
+  const budgetRisk=ratio>1?'Over budget':ratio>.92?'Stretch':ratio>.8?'Watch spend':'Comfortable';
+  const riskNote=ratio>1?'This exceeds your stated on-road budget before running costs.':ratio>.92?'Leaves little room for insurance, accessories or price movement.':ratio>.8?'Fits, but keep a buffer for insurance and accessories.':'Leaves a useful buffer for purchase-day costs.';
+  return {ownershipEstimate:{period:'Year 1 planning estimate',fuel:annualFuel,service:annualService,insurance:annualInsurance,total:ownershipYearOne,disclaimer:'Internal planning range; usage, insurer, fuel price and city can change actual cost.'},budgetRisk,riskNote};
+}
+function archetypes(items) {
+  if (!items.length) return {};
+  const cheapest=[...items].sort((a,b)=>a.onRoad-b.onRoad)[0];
+  const comfort=[...items].sort((a,b)=>(/auto|amt|cvt|dct|ivt/i.test(b.gearbox)?1:0)-(/auto|amt|cvt|dct|ivt/i.test(a.gearbox)?1:0)||b.fitScore-a.fitScore)[0];
+  const safe=[...items].filter(item=>item.budgetRisk==='Comfortable').sort((a,b)=>b.fitScore-a.fitScore)[0] ?? items[0];
+  return {bestValue:cheapest.id,bestComfort:comfort.id,safeAlternative:safe.id};
+}
+async function recordInteraction(db,visitor,vehicleId,action) {
+  await db.prepare('INSERT INTO buyer_interactions (id,visitor,vehicle_id,action,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),visitor,vehicleId,action,new Date().toISOString()).run();
+}
 function providerRecommendations(result, input) {
   const data=result?.data ?? result;
   return (data.items ?? []).map(item=>{
@@ -122,6 +145,7 @@ function providerRecommendations(result, input) {
     estimatedOwnershipCost:item.estimatedOwnershipCost ?? null,
     detailUrl:item.href ?? null,
     ...fitExplanation(choice,input),
+    ...confidenceFor(choice,input),
   };}).sort((a,b)=>b.fitScore-a.fitScore || a.onRoad-b.onRoad);
 }
 async function saveBuyerProfile(db, visitor, input) {
@@ -279,16 +303,30 @@ async function api(request, env, url, visitor, native) {
     const preferredTransmission=decisionInput(input).transmission;
     const providerInput={budget:input.budget,loc:stateForCity(city.id),price:'onroad',gearbox:preferredTransmission==='automatic'||input.features.includes('automatic')?'auto':preferredTransmission==='manual'?'manual':'open',seats:decisionInput(input).household==='family'?5:4,usage:input.use || 'city',charging:'no'};
     const result=await cachedPickMyCar(db,env,'recommendations',JSON.stringify(providerInput),'recommendations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(providerInput)});
-    if (result) return json({source:'india_provider',city,items:providerRecommendations(result,input),attribution:result.attribution ?? {name:"Let's Pick My Car",url:'https://letspickmycar.com'},datasetRevision:result.datasetRevision ?? null});
+    if (result) { const items=providerRecommendations(result,input); return json({source:'india_provider',city,items,decisionPaths:archetypes(items),attribution:result.attribution ?? {name:"Let's Pick My Car",url:'https://letspickmycar.com'},datasetRevision:result.datasetRevision ?? null}); }
     const internal=await catalog(db,city.id);
     const params=new URLSearchParams({budget:String(input.budget),use:input.use ?? ''});
     for (const feature of input.features) params.append('feature',feature);
     const matches=matchCars(internal,params);
-    return json({source:'internal_estimate',city,items:matches.map(match=>{const car=internal.cars.find(item=>item.id===match.id);const choice={onRoad:match.total,gearbox:car.gearbox,seats:5,highlights:car.factory.map(key=>internal.features[key].name),limitations:[]};return {id:car.id,name:car.model+' '+car.trim,onRoad:match.total,fuel:car.fuel,gearbox:car.gearbox,highlights:choice.highlights,limitations:[],sources:[],pricesVerified:car.priceDate,specsVerified:null,dataUpdated:car.priceDate,coverageNote:'MotorForm internal estimated pricing. Confirm final dealer quote.',...fitExplanation(choice,input,car.factory)};}).sort((a,b)=>b.fitScore-a.fitScore || a.onRoad-b.onRoad),attribution:{name:'MotorForm internal estimated pricing',url:null}});
+    const items=matches.map(match=>{const car=internal.cars.find(item=>item.id===match.id);const choice={onRoad:match.total,gearbox:car.gearbox,seats:5,highlights:car.factory.map(key=>internal.features[key].name),limitations:[]};return {id:car.id,name:car.model+' '+car.trim,onRoad:match.total,fuel:car.fuel,gearbox:car.gearbox,highlights:choice.highlights,limitations:[],sources:[],pricesVerified:car.priceDate,specsVerified:null,dataUpdated:car.priceDate,coverageNote:'MotorForm internal estimated pricing. Confirm final dealer quote.',...fitExplanation(choice,input,car.factory),...confidenceFor(choice,input)};}).sort((a,b)=>b.fitScore-a.fitScore || a.onRoad-b.onRoad);
+    return json({source:'internal_estimate',city,items,decisionPaths:archetypes(items),attribution:{name:'MotorForm internal estimated pricing',url:null}});
   }
   if (pathname === '/api/buyer-profile' && method === 'GET') {
     const profile=await db.prepare('SELECT preferences_json,updated_at FROM buyer_profiles WHERE visitor=?').bind(visitor).first();
     return json(profile ? {preferences:JSON.parse(profile.preferences_json),updatedAt:profile.updated_at} : {preferences:null});
+  }
+  if (pathname === '/api/decision-confidence' && method === 'GET') {
+    const city=cityFor(searchParams.get('city'));
+    const dealer=await db.prepare("SELECT COUNT(*) AS active, SUM(CASE WHEN response_quality='responsive' THEN 1 ELSE 0 END) AS responsive, MIN(typical_response_hours) AS fastest FROM dealers WHERE city_id=? AND active=1").bind(city.id).first();
+    const interactions=await db.prepare("SELECT action,COUNT(*) AS count FROM buyer_interactions WHERE visitor=? GROUP BY action").bind(visitor).all();
+    const activity=Object.fromEntries(interactions.results.map(row=>[row.action,row.count]));
+    return json({city,dealerAvailability:{active:dealer?.active ?? 0,responsive:dealer?.responsive ?? 0,fastestResponseHours:dealer?.fastest ?? null,label:(dealer?.active ?? 0)>0?'Dealer network data is available for this city.':'No verified dealer availability is listed yet.'},buyerSignals:{saved:activity.saved ?? 0,compared:activity.compared ?? 0,enquired:activity.enquired ?? 0,disclaimer:'Only your own actions are used to improve your shortlist on this device.'},reviews:{status:'not_connected',label:'Verified reviews are unavailable until a licensed review provider is connected.'}});
+  }
+  if (pathname === '/api/interactions' && method === 'POST') {
+    const input=await body(request);
+    if (!input || !clean(input.vehicleId,120) || input.action!=='compared') return json({error:'Invalid interaction.'},400);
+    await recordInteraction(db,visitor,input.vehicleId,'compared');
+    return json({ok:true},201);
   }
   if (pathname === '/api/provider-comparisons' && method === 'POST') {
     await enforceRateLimit(db,visitor,'provider',8);
@@ -315,14 +353,14 @@ async function api(request, env, url, visitor, native) {
       return json(results);
     }
     if (pathname === '/api/operator/dealers' && method === 'GET') {
-      const {results}=await db.prepare('SELECT id,name,city_id,email,active,created_at FROM dealers ORDER BY active DESC,name LIMIT 200').all();
+      const {results}=await db.prepare('SELECT id,name,city_id,email,active,response_quality,typical_response_hours,created_at FROM dealers ORDER BY active DESC,name LIMIT 200').all();
       return json(results);
     }
     if (pathname === '/api/operator/dealers' && method === 'POST') {
       const input=await body(request);
-      if (!input || !clean(input.name,160) || !clean(input.cityId,64) || !cities.some(city=>city.id===input.cityId) || (input.email !== undefined && (typeof input.email !== 'string' || input.email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)))) return json({error:'Provide a valid dealer name, city and optional email.'},400);
+      if (!input || !clean(input.name,160) || !clean(input.cityId,64) || !cities.some(city=>city.id===input.cityId) || !['unrated','responsive','slow'].includes(input.responseQuality ?? 'unrated') || (input.typicalResponseHours !== undefined && (!Number.isSafeInteger(input.typicalResponseHours) || input.typicalResponseHours<1 || input.typicalResponseHours>720)) || (input.email !== undefined && (typeof input.email !== 'string' || input.email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)))) return json({error:'Provide a valid dealer name, city and optional service data.'},400);
       const id=crypto.randomUUID(); const createdAt=new Date().toISOString();
-      await db.prepare('INSERT INTO dealers (id,name,city_id,email,created_at) VALUES (?,?,?,?,?)').bind(id,input.name,input.cityId,input.email ?? null,createdAt).run();
+      await db.prepare('INSERT INTO dealers (id,name,city_id,email,response_quality,typical_response_hours,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,input.name,input.cityId,input.email ?? null,input.responseQuality ?? 'unrated',input.typicalResponseHours ?? null,createdAt).run();
       return json({id},201);
     }
     if (pathname === '/api/operator/enquiries/assign' && method === 'POST') {
@@ -363,6 +401,7 @@ async function api(request, env, url, visitor, native) {
       if (payload.length>20_000) return json({error:'Vehicle payload is too large.'},400);
       const now=new Date().toISOString();
       await db.prepare('INSERT INTO saved_vehicles (visitor,vehicle_id,provider_id,payload_json,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(visitor,vehicle_id,provider_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at').bind(visitor,vehicle.id,'lets-pick-my-car',payload,now,now).run();
+      await recordInteraction(db,visitor,vehicle.id,'saved');
       return json({ok:true});
     }
     if (method === 'DELETE') {
@@ -380,8 +419,8 @@ async function api(request, env, url, visitor, native) {
     if (method === 'PUT') {
       const input = await body(request);
       if (!input || typeof input.saved !== 'boolean' || !(await catalog(db)).cars.some(car => car.id === input.variant)) return json({error:'Unknown variant.'},400);
-      if (input.saved) await db.prepare('INSERT OR IGNORE INTO shortlist (visitor,variant) VALUES (?,?)').bind(visitor,input.variant).run();
-      else await db.prepare('DELETE FROM shortlist WHERE visitor=? AND variant=?').bind(visitor,input.variant).run();
+      if (input.saved) { await db.prepare('INSERT OR IGNORE INTO shortlist (visitor,variant) VALUES (?,?)').bind(visitor,input.variant).run(); await recordInteraction(db,visitor,input.variant,'saved'); }
+      else { await db.prepare('DELETE FROM shortlist WHERE visitor=? AND variant=?').bind(visitor,input.variant).run(); await recordInteraction(db,visitor,input.variant,'unsaved'); }
       return json({ok:true});
     }
   }
@@ -406,6 +445,7 @@ async function api(request, env, url, visitor, native) {
         .bind(id,visitor,car.id,(car.model+' '+car.trim).trim(),input.purpose,JSON.stringify([...new Set(input.upgrades)]),createdAt,input.email,city.id,createdAt,external?'lets-pick-my-car':null,external?input.providerVariantId:null,visitor)
         .run().then(result => { if (!result.meta.changes) throw new RangeError('Limit'); });
       await db.prepare('INSERT INTO enquiry_events (id,enquiry_id,to_status,actor,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,'received','buyer',createdAt).run();
+      await recordInteraction(db,visitor,input.variant,'enquired');
       return json({id,status:'received'},201);
     }
   }

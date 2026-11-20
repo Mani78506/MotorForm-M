@@ -6,7 +6,7 @@ import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navig
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
-import { Catalog, Car, Enquiry, Match, Recommendation, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, loadCatalog, offlineMatches, onRoad, rupees } from './api';
+import { Catalog, Car, Enquiry, Match, Recommendation, DecisionConfidence, request, getRecommendations, getSavedProviderVehicles, saveProviderVehicle, removeProviderVehicle, getDecisionConfidence, recordComparison, loadCatalog, offlineMatches, onRoad, rupees } from './api';
 
 const navy='#102643', ink='#10213A', blue='#1C5CA8', muted='#4B5D75', border='#D9E3EF';
 type Icon=React.ComponentProps<typeof Ionicons>['name'];
@@ -107,7 +107,7 @@ function CarCard({car,total,features,matched,saved,selected,onSave,onCompare,onO
   </View>;
 }
 function RecommendationCard({item,attribution,saved,onSave,onEnquire}:{item:Recommendation;attribution:string;saved:boolean;onSave:()=>void;onEnquire:()=>void}) {
-  return <View style={s.card}><View style={s.cardTop}><View style={s.providerThumb}><Ionicons name="car-sport" size={34} color={blue}/></View><View style={s.cardSummary}><Text style={s.heading}>{item.name}</Text><Text style={s.small}>{item.fuel} · {item.gearbox}{item.seats?' · '+item.seats+' seats':''}</Text><View style={s.priceTile}><Text style={s.tiny}>Estimated on-road</Text><Text style={s.price}>{rupees(item.onRoad)}</Text></View></View></View><View style={s.cardBody}>{item.fitScore?<View style={s.fitPanel}><Text style={s.fitScore}>{item.fitScore}% fit</Text><Text style={s.small}>{item.decisionLabel}{item.budgetHeadroom!==undefined?' · '+rupees(item.budgetHeadroom)+' headroom':''}</Text></View>:null}{item.whyItFits?.map(reason=><Text key={reason} style={s.small}>✓ {reason}</Text>)}{item.watchOuts?.map(reason=><Text key={reason} style={s.watchOut}>! {reason}</Text>)}<View style={s.row}>{item.highlights.slice(0,3).map(value=><Text style={s.tag} key={value}>{value}</Text>)}</View><Text style={s.small}>{item.pricesVerified?'Prices checked '+item.pricesVerified+'. ':''}{attribution} · confirm final dealer quote.</Text><View style={s.row}><Button secondary label={saved?'Saved':'Save car'} onPress={onSave}/><Button secondary label="Request quote" onPress={onEnquire}/>{item.detailUrl?<Text accessibilityRole="link" onPress={()=>{void Linking.openURL(item.detailUrl!).catch(()=>{});}} style={s.sourceLink}>Sources ↗</Text>:null}</View></View></View>;
+  return <View style={s.card}><View style={s.cardTop}><View style={s.providerThumb}><Ionicons name="car-sport" size={34} color={blue}/></View><View style={s.cardSummary}><Text style={s.heading}>{item.name}</Text><Text style={s.small}>{item.fuel} · {item.gearbox}{item.seats?' · '+item.seats+' seats':''}</Text><View style={s.priceTile}><Text style={s.tiny}>Estimated on-road</Text><Text style={s.price}>{rupees(item.onRoad)}</Text></View></View></View><View style={s.cardBody}>{item.fitScore?<View style={s.fitPanel}><Text style={s.fitScore}>{item.fitScore}% fit</Text><Text style={s.small}>{item.decisionLabel}{item.budgetHeadroom!==undefined?' · '+rupees(item.budgetHeadroom)+' headroom':''}</Text></View>:null}{item.ownershipEstimate?<View style={s.costPanel}><Text style={s.costTitle}>Year-one ownership plan · {rupees(item.ownershipEstimate.total)}</Text><Text style={s.small}>Fuel {rupees(item.ownershipEstimate.fuel)} · Service {rupees(item.ownershipEstimate.service)} · Insurance {rupees(item.ownershipEstimate.insurance)}</Text><Text style={item.budgetRisk==='Comfortable'?s.small:s.watchOut}>{item.budgetRisk}: {item.riskNote}</Text></View>:null}{item.whyItFits?.map(reason=><Text key={reason} style={s.small}>✓ {reason}</Text>)}{item.watchOuts?.map(reason=><Text key={reason} style={s.watchOut}>! {reason}</Text>)}<View style={s.row}>{item.highlights.slice(0,3).map(value=><Text style={s.tag} key={value}>{value}</Text>)}</View><Text style={s.small}>{item.pricesVerified?'Prices checked '+item.pricesVerified+'. ':''}{attribution} · confirm final dealer quote.</Text><View style={s.row}><Button secondary label={saved?'Saved':'Save car'} onPress={onSave}/><Button secondary label="Request quote" onPress={onEnquire}/>{item.detailUrl?<Text accessibilityRole="link" onPress={()=>{void Linking.openURL(item.detailUrl!).catch(()=>{});}} style={s.sourceLink}>Sources ↗</Text>:null}</View></View></View>;
 }
 function ProviderEnquire({item,city,onDone}:{item:Recommendation;city:string;onDone:()=>void}) {
   const [purpose,setPurpose]=useState<'quote'|'test-drive'>('test-drive');const [email,setEmail]=useState('');const [pending,setPending]=useState(false);const [message,setMessage]=useState('');
@@ -192,6 +192,7 @@ function MotorForm() {
   const [providerMatches,setProviderMatches]=useState<Recommendation[]>([]);
   const [providerSaved,setProviderSaved]=useState<Recommendation[]>([]);
   const [recommendationAttribution,setRecommendationAttribution]=useState('');
+  const [confidence,setConfidence]=useState<DecisionConfidence>();
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -203,7 +204,7 @@ function MotorForm() {
       const {catalog:data,offline}=await loadCatalog(city);
       setCatalog(data);
       if (offline) setNotice('You are browsing the built-in catalog. Connect to the internet to save cars or send enquiries.');
-      try { setSaved(await request<string[]>('shortlist'));setProviderSaved(await getSavedProviderVehicles()); }
+      try { const [shortlist,providerSavedCars,confidenceData]=await Promise.all([request<string[]>('shortlist'),getSavedProviderVehicles(),getDecisionConfidence(city)]);setSaved(shortlist);setProviderSaved(providerSavedCars);setConfidence(confidenceData); }
       catch { setNotice('Saved cars are unavailable. Reopen the app to retry.'); }
     } catch { setError('Could not load the catalog. Check your connection and try again.'); }
   },[city]);
@@ -246,6 +247,7 @@ function MotorForm() {
     if (compare.includes(car.id)) { setCompare(compare.filter(id=>id!==car.id)); return; }
     if (compare.length>=3) { setNotice('Remove a variant before adding another.'); return; }
     setCompare([...compare,car.id]);
+    void recordComparison(car.id).catch(()=>{});
     setUpgrades(current=>({...current,[car.id]:matches?.find(item=>item.id===car.id)?.upgrades??[]}));
   }
   function toggle(id:string,key:string) {
@@ -273,7 +275,7 @@ function MotorForm() {
       <Tab.Screen name="Find" options={{title:'Find my car',tabBarLabel:'Find'}}>{({navigation}:BottomTabScreenProps<Tabs,'Find'>)=><FindScreen catalog={catalog!} busy={busy} error={error} onCity={setCity} onFind={(budget,use,features,query,decision)=>void find(budget,use,features,query,decision,()=>navigation.navigate('Matches'))}/>}</Tab.Screen>
       <Tab.Screen name="Matches" options={{title:'Matches for you',tabBarLabel:'Matches'}}>{({navigation})=><Frame>
         {!!notice&&<Text accessibilityRole="alert" style={s.error}>{notice}</Text>}
-        {providerMatches.length ? <><Text style={s.small}>{providerMatches.length} recommended variants · {catalog!.city.name} · {recommendationAttribution}</Text>{providerMatches.map(item=><RecommendationCard key={item.id} item={item} attribution={recommendationAttribution} saved={providerSaved.some(value=>value.id===item.id)} onSave={()=>void saveProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}</> : matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · {catalog!.city.name} · Internal estimates</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
+        {providerMatches.length ? <><View style={s.confidencePanel}><Text style={s.heading}>Decision confidence</Text><Text style={s.small}>{confidence?.dealerAvailability.label ?? 'Checking local dealer availability…'}</Text><Text style={s.small}>{confidence?.reviews.label ?? 'Verified review coverage is not connected.'}</Text></View><Text style={s.small}>{providerMatches.length} recommended variants · {catalog!.city.name} · {recommendationAttribution}</Text>{providerMatches.map(item=><RecommendationCard key={item.id} item={item} attribution={recommendationAttribution} saved={providerSaved.some(value=>value.id===item.id)} onSave={()=>void saveProvider(item)} onEnquire={()=>openProviderEnquiry(go,item)}/>)}</> : matches?.length ? <Text style={s.small}>{matches.length} best {matches.length===1?'match':'matches'} · {catalog!.city.name} · Internal estimates</Text> : <Empty icon="car-outline" title={matches?'No exact matches':'Find your top matches'} detail={matches?'Try a higher budget or fewer required features.':'Set your budget and priorities to start.'}/>}
         {list(go,(matches??[]).flatMap(match=>cars.filter(car=>car.id===match.id)),true)}
         {compare.length>0&&<Button label={'Compare ('+compare.length+')'} icon="swap-horizontal-outline" onPress={()=>navigation.navigate('Compare')}/>}
         <Button label="Edit preferences" secondary onPress={()=>navigation.navigate('Find')}/>
@@ -319,6 +321,7 @@ const s=StyleSheet.create({
   slider:{width:'100%',height:38},
   price:{color:navy,fontSize:16,fontWeight:'800'},priceTile:{backgroundColor:'#DDEEFF',borderRadius:8,paddingHorizontal:8,paddingVertical:5},
   fitPanel:{backgroundColor:'#E8F4EC',borderRadius:10,padding:9,gap:2},fitScore:{color:'#175D35',fontSize:16,fontWeight:'900'},watchOut:{color:'#8A4B08',fontSize:13,lineHeight:19},
+  costPanel:{backgroundColor:'#F0F5FB',borderRadius:10,padding:9,gap:3},costTitle:{color:ink,fontSize:13,fontWeight:'800'},confidencePanel:{backgroundColor:'#FFF',borderWidth:1,borderColor:border,borderRadius:13,padding:12,gap:5},
   button:{flexDirection:'row',justifyContent:'center',alignItems:'center',minHeight:45,gap:6,borderRadius:10,backgroundColor:navy,paddingHorizontal:11,paddingVertical:9},
   buttonText:{fontSize:13,fontWeight:'800',color:'#FFF'},secondary:{backgroundColor:'#FFF',borderWidth:1,borderColor:border},secondaryText:{color:blue},
   disabled:{opacity:.55},
