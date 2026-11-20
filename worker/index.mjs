@@ -324,7 +324,10 @@ async function api(request, env, url, visitor, native) {
     const city=cityFor(input.city);
     await saveBuyerProfile(db,visitor,input);
     const preferredTransmission=decisionInput(input).transmission;
-    const providerInput={budget:input.budget,loc:stateForCity(city.id),price:'onroad',gearbox:preferredTransmission==='automatic'||input.features.includes('automatic')?'auto':preferredTransmission==='manual'?'manual':'open',seats:decisionInput(input).household==='family'?5:4,usage:input.use || 'city',charging:'no'};
+    // Provider accepts city, mixed or highway. MotorForm's family journey maps
+    // to mixed driving rather than failing the request and showing stale demos.
+    const providerUsage=input.use==='family' ? 'mixed' : (input.use || 'city');
+    const providerInput={budget:input.budget,loc:stateForCity(city.id),price:'onroad',gearbox:preferredTransmission==='automatic'||input.features.includes('automatic')?'auto':preferredTransmission==='manual'?'manual':'any',seats:decisionInput(input).household==='family'?5:4,usage:providerUsage,charging:'no'};
     let result=null;
     try { result=await cachedPickMyCar(db,env,'recommendations',JSON.stringify(providerInput),'recommendations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(providerInput)}); }
     catch { result=null; }
