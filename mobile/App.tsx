@@ -103,7 +103,7 @@ function CarCard({car,total,features,matched,saved,selected,onSave,onCompare,onO
   return <View style={s.card}>
     <View style={s.cardTop}>
       <Pressable accessibilityRole="button" accessibilityLabel={'View '+car.model+' details'} onPress={onOpen}><Photo car={car} variant="card"/></Pressable>
-      <View style={s.cardSummary}><Text style={s.heading}>{car.model}</Text><Text style={s.small}>{car.trim} · {car.gearbox}</Text><View style={s.priceTile}><Text style={s.tiny}>On-road est.</Text><Text style={s.price}>{rupees(total)}</Text></View></View>
+      <View style={s.cardSummary}><Text style={s.heading}>{car.model}</Text><Text style={s.small}>{car.trim} · {car.gearbox}</Text><Text style={s.tiny}>Model reference · trim/colour may vary</Text><View style={s.priceTile}><Text style={s.tiny}>On-road est.</Text><Text style={s.price}>{rupees(total)}</Text></View></View>
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel={saved?'Remove saved car':'Save car'} accessibilityState={{selected:saved}} style={s.heart} onPress={onSave}><Ionicons name={saved?'heart':'heart-outline'} size={23} color={saved?'#A61B52':navy}/></Pressable>
     <View style={s.cardBody}>
@@ -180,7 +180,7 @@ function Compare({cars,catalog,upgrades,toggle,onEnquire}:{cars:Car[];catalog:Ca
   const featureRows=Object.entries(catalog.features);
   return <Frame>
     <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled><View style={s.compareTable}>
-      <View style={s.compareRow}>{cars.map((car,index)=><View style={{width:cellWidth,gap:6}} key={car.id}><Photo car={car} variant="compare"/><Text style={s.bold}>{car.model}</Text><Text style={s.small}>{car.trim}</Text><Text style={s.price}>{rupees(totals[index])}</Text><Text style={s.tiny}>On-road est. with upgrades</Text><View style={s.bar}><View style={[s.barFill,{width:`${Math.round(totals[index]/Math.max(1,...totals)*100)}%`}]}/></View></View>)}</View>
+      <View style={s.compareRow}>{cars.map((car,index)=><View style={{width:cellWidth,gap:6}} key={car.id}><Photo car={car} variant="compare"/><Text style={s.bold}>{car.model}</Text><Text style={s.small}>{car.trim}</Text><Text style={s.tiny}>Model ref. · trim may vary</Text><Text style={s.price}>{rupees(totals[index])}</Text><Text style={s.tiny}>On-road est. with upgrades</Text><View style={s.bar}><View style={[s.barFill,{width:`${Math.round(totals[index]/Math.max(1,...totals)*100)}%`}]}/></View></View>)}</View>
       {featureRows.map(([key,feature])=><View style={s.compareFeature} key={key}><Text style={s.bold}>{feature.name}</Text><View style={s.compareRow}>{cars.map(car=><View key={car.id} style={{width:cellWidth,alignItems:'flex-start'}}>{car.factory.includes(key)?<Text style={s.factory}>✓ Factory</Text>:car.options.includes(key)?<Chip label={(upgrades[car.id]??[]).includes(key)?'✓ '+rupees(feature.cost??0):'+ '+rupees(feature.cost??0)} selected={(upgrades[car.id]??[]).includes(key)} onPress={()=>toggle(car.id,key)}/>:<Text style={s.tag}>Unconfirmed</Text>}</View>)}</View></View>)}
       <View style={s.compareRow}>{cars.map(car=><View style={{width:cellWidth}} key={car.id}><Button label="Enquire" secondary onPress={()=>onEnquire(car)}/></View>)}</View>
     </View></ScrollView>
