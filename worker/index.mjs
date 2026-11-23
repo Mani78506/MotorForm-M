@@ -27,6 +27,7 @@ const providers = [
   {id:'fleetbyte-catalog',name:'fleetByte Catalog',status:'active',coverage:'Global makes, models and variants',live:true},
   {id:'lets-pick-my-car',name:"Let's Pick My Car",status:'requires_api_key',coverage:'India variants, planning estimates and comparisons',live:true},
 ];
+const launchCatalogTargets=globalThis.__launchCatalogTargets ?? {models:[]};
 async function fleetByte(path, params) {
   const url=new URL('https://fleetcatalog.disturbingbyte.pt/v1/'+path);
   for (const [key,value] of params) if (typeof value === 'string' && value.length) url.searchParams.set(key,value);
@@ -235,6 +236,8 @@ async function ensureMarketplace(db) {
     ...cities.map(city=>db.prepare('INSERT OR IGNORE INTO cities (id,name,state_code,state_name,registration_multiplier,updated_at) VALUES (?,?,?,?,?,?)').bind(city.id,city.name,city.id==='delhi'?'DL':city.id==='bengaluru'?'KA':city.id==='mumbai'||city.id==='pune'?'MH':city.id==='chennai'?'TN':city.id==='kolkata'?'WB':city.id==='ahmedabad'?'GJ':'TS',city.state,city.cost,now)),
   ];
   await db.batch(referenceStatements);
+  const targets=(launchCatalogTargets.models ?? []).map((target,index)=>db.prepare('INSERT OR IGNORE INTO catalog_curation_targets (id,brand_name,model_name,body_type,updated_at) VALUES (?,?,?,?,?)').bind('launch-'+String(index+1).padStart(2,'0'),target.brand,target.model,target.bodyType,now));
+  for (let offset=0;offset<targets.length;offset+=80) await db.batch(targets.slice(offset,offset+80));
   const existing=await db.prepare('SELECT id FROM variants LIMIT 1').first();
   if (existing) return;
   const statements=[];
@@ -431,6 +434,17 @@ async function api(request, env, url, visitor, native) {
       statements.push(db.prepare('INSERT INTO catalog_imports (id,source_name,source_url,imported_by,records_created,records_updated,created_at) VALUES (?,?,?,?,?,?,?)').bind(importId,source.name,source.url,'operator',variants.length,prices+specs+equipment,now));
       for (let offset=0;offset<statements.length;offset+=80) await db.batch(statements.slice(offset,offset+80));
       return json({id:importId,variants:variants.length,prices,specifications:specs,equipment},201);
+    }
+    if (pathname === '/api/operator/catalog/targets' && method === 'GET') {
+      const {results}=await db.prepare('SELECT id,brand_name,model_name,body_type,stage,source_count,imported_variant_count,note,updated_at FROM catalog_curation_targets ORDER BY stage,brand_name,model_name').all();
+      return json(results);
+    }
+    if (pathname === '/api/operator/catalog/targets' && method === 'PATCH') {
+      const input=await body(request);
+      if (!input || !clean(input.id,80) || !['source_collection','variant_capture','quality_review','published','blocked'].includes(input.stage) || (input.note!==undefined && !clean(input.note,400)) || (input.sourceCount!==undefined && (!Number.isSafeInteger(input.sourceCount)||input.sourceCount<0||input.sourceCount>100)) || (input.importedVariantCount!==undefined && (!Number.isSafeInteger(input.importedVariantCount)||input.importedVariantCount<0||input.importedVariantCount>500))) return json({error:'Provide a valid curation target update.'},400);
+      const result=await db.prepare('UPDATE catalog_curation_targets SET stage=?,source_count=COALESCE(?,source_count),imported_variant_count=COALESCE(?,imported_variant_count),note=COALESCE(?,note),updated_at=? WHERE id=?').bind(input.stage,input.sourceCount ?? null,input.importedVariantCount ?? null,input.note ?? null,new Date().toISOString(),input.id).run();
+      if (!result.meta.changes) return json({error:'Catalog target not found.'},404);
+      return json({ok:true});
     }
     if (pathname === '/api/operator/enquiries' && method === 'GET') {
       const {results} = await db.prepare('SELECT id,title,purpose,upgrades,status,created_at,updated_at,email,city_id,dealer_id,provider_id,provider_variant_id FROM enquiries ORDER BY created_at DESC LIMIT 100').all();
