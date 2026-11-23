@@ -1,6 +1,7 @@
 const json = (value, status = 200) => Response.json(value, {status, headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const validId = value => typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(value);
 const clean = (value, limit = 90) => typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= limit && !/[&<>"'\x00-\x1f]/.test(value);
+const sourceUrl = value => { try { const url=new URL(value); return value.length<=2000 && ['https:','http:'].includes(url.protocol); } catch { return false; } };
 const amount = value => Number.isSafeInteger(value) && value >= 0 && value <= 100_000_000;
 const uuid = /^[0-9a-f-]{36}$/;
 const nativeSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -22,6 +23,7 @@ const cityFor = id => cities.find(city => city.id === id) ?? cities[0];
 const stateForCity = id => ({hyderabad:'TS',bengaluru:'KA',mumbai:'MH',delhi:'DL',pune:'MH',chennai:'TN',kolkata:'WB',ahmedabad:'GJ'})[id] ?? 'TS';
 const providers = [
   {id:'motorform-estimates',name:'MotorForm internal estimated pricing',status:'active',coverage:'India launch cities',live:false},
+  {id:'official-oem',name:'Official manufacturer sources',status:'active',coverage:'Verified India model, variant, specification and price data',live:false},
   {id:'fleetbyte-catalog',name:'fleetByte Catalog',status:'active',coverage:'Global makes, models and variants',live:true},
   {id:'lets-pick-my-car',name:"Let's Pick My Car",status:'requires_api_key',coverage:'India variants, planning estimates and comparisons',live:true},
 ];
@@ -227,6 +229,7 @@ async function ensureMarketplace(db) {
   const now=new Date().toISOString();
   const referenceStatements=[
     db.prepare('INSERT OR IGNORE INTO providers (id,name,kind,status,attribution,created_at) VALUES (?,?,?,?,?,?)').bind('motorform-estimates','MotorForm internal estimated pricing','internal','active','Planning estimates only; confirm final dealer quote.',now),
+    db.prepare('INSERT OR IGNORE INTO providers (id,name,kind,status,attribution,created_at) VALUES (?,?,?,?,?,?)').bind('official-oem','Official manufacturer sources','catalog','active','Variant facts and prices sourced from official manufacturer pages and brochures.',now),
     db.prepare('INSERT OR IGNORE INTO providers (id,name,kind,status,attribution,created_at) VALUES (?,?,?,?,?,?)').bind('fleetbyte-catalog','fleetByte Catalog','catalog','active','Supplementary global specifications.',now),
     db.prepare('INSERT OR IGNORE INTO providers (id,name,kind,status,attribution,created_at) VALUES (?,?,?,?,?,?)').bind('lets-pick-my-car',"Let's Pick My Car",'india_market','active','Indian catalogue, planning estimates and comparisons; attribution required.',now),
     ...cities.map(city=>db.prepare('INSERT OR IGNORE INTO cities (id,name,state_code,state_name,registration_multiplier,updated_at) VALUES (?,?,?,?,?,?)').bind(city.id,city.name,city.id==='delhi'?'DL':city.id==='bengaluru'?'KA':city.id==='mumbai'||city.id==='pune'?'MH':city.id==='chennai'?'TN':city.id==='kolkata'?'WB':city.id==='ahmedabad'?'GJ':'TS',city.state,city.cost,now)),
@@ -406,6 +409,28 @@ async function api(request, env, url, visitor, native) {
       if (!validCatalog(input)) return json({error:'Invalid catalog. Check configurations, dates and feature references.'},400);
       await db.prepare('INSERT INTO catalog (id,payload) VALUES (1,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').bind(JSON.stringify(input)).run();
       return json({ok:true});
+    }
+    if (pathname === '/api/operator/catalog/import' && method === 'POST') {
+      const input=await body(request); const source=input?.source; const variants=input?.variants;
+      const validSource=source && clean(source.name,160) && sourceUrl(source.url) && typeof source.checkedAt==='string' && /^\d{4}-\d{2}-\d{2}/.test(source.checkedAt);
+      const validVariant=entry=>entry && validId(entry.brand?.id) && clean(entry.brand?.name,120) && validId(entry.model?.id) && clean(entry.model?.name,120) && clean(entry.model?.bodyType,80) && validId(entry.variant?.id) && clean(entry.variant?.name,140) && clean(entry.variant?.fuel,40) && clean(entry.variant?.gearbox,40) && (entry.variant.seats===undefined || (Number.isInteger(entry.variant.seats)&&entry.variant.seats>0&&entry.variant.seats<20)) && amount(entry.variant.exShowroom) && Array.isArray(entry.prices) && entry.prices.length>0 && entry.prices.every(price=>cities.some(city=>city.id===price.cityId)&&amount(price.onRoad)&&amount(price.registration)&&amount(price.insurance)&&['sourced','dealer_verified'].includes(price.confidence)&&sourceUrl(price.sourceUrl ?? source.url)&&typeof price.checkedAt==='string'&&/^\d{4}-\d{2}-\d{2}/.test(price.checkedAt)) && Array.isArray(entry.specifications ?? []) && (entry.specifications ?? []).every(spec=>validId(spec.key)&&clean(spec.label,120)&&clean(spec.value,240)&&(spec.unit===undefined||clean(spec.unit,40))&&sourceUrl(spec.sourceUrl ?? source.url)&&typeof spec.checkedAt==='string'&&/^\d{4}-\d{2}-\d{2}/.test(spec.checkedAt)) && Array.isArray(entry.equipment ?? []) && (entry.equipment ?? []).every(feature=>validId(feature.key)&&clean(feature.category,80)&&clean(feature.label,120)&&clean(feature.value,240)&&(feature.note===undefined||clean(feature.note,400))&&sourceUrl(feature.sourceUrl ?? source.url)&&typeof feature.checkedAt==='string'&&/^\d{4}-\d{2}-\d{2}/.test(feature.checkedAt));
+      if (!validSource || !Array.isArray(variants) || variants.length<1 || variants.length>250 || !variants.every(validVariant)) return json({error:'Provide a source-stamped batch of valid variants, prices, specifications and equipment.'},400);
+      if (variants.some(entry=>(entry.prices?.length ?? 0)>8 || (entry.specifications?.length ?? 0)>60 || (entry.equipment?.length ?? 0)>80)) return json({error:'Keep each import record within the supported price, specification and equipment limits.'},400);
+      const now=new Date().toISOString(); const importId=crypto.randomUUID(); const statements=[]; let prices=0; let specs=0; let equipment=0;
+      for (const entry of variants) {
+        const variant=entry.variant;
+        statements.push(
+          db.prepare('INSERT INTO brands (id,name,active,created_at,updated_at) VALUES (?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,active=1,updated_at=excluded.updated_at').bind(entry.brand.id,entry.brand.name,now,now),
+          db.prepare('INSERT INTO models (id,brand_id,name,body_type,active,created_at,updated_at) VALUES (?,?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET brand_id=excluded.brand_id,name=excluded.name,body_type=excluded.body_type,active=1,updated_at=excluded.updated_at').bind(entry.model.id,entry.brand.id,entry.model.name,entry.model.bodyType,now,now),
+          db.prepare("INSERT INTO variants (id,model_id,name,fuel,gearbox,seats,ex_showroom,uses_json,factory_features_json,optional_features_json,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET model_id=excluded.model_id,name=excluded.name,fuel=excluded.fuel,gearbox=excluded.gearbox,seats=excluded.seats,ex_showroom=excluded.ex_showroom,active=1,updated_at=excluded.updated_at").bind(variant.id,entry.model.id,variant.name,variant.fuel,variant.gearbox,variant.seats ?? null,variant.exShowroom,JSON.stringify(variant.uses ?? []),'[]','[]',now,now)
+        );
+        for (const price of entry.prices) { prices++; statements.push(db.prepare('INSERT INTO city_prices (id,variant_id,city_id,on_road,registration,insurance,confidence,provider_id,source_url,checked_at,valid_until) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(variant_id,city_id) DO UPDATE SET on_road=excluded.on_road,registration=excluded.registration,insurance=excluded.insurance,confidence=excluded.confidence,provider_id=excluded.provider_id,source_url=excluded.source_url,checked_at=excluded.checked_at,valid_until=excluded.valid_until').bind(variant.id+'-'+price.cityId,variant.id,price.cityId,price.onRoad,price.registration,price.insurance,price.confidence,'official-oem',price.sourceUrl ?? source.url,price.checkedAt,price.validUntil ?? null)); }
+        for (const spec of entry.specifications ?? []) { specs++; statements.push(db.prepare('INSERT INTO variant_specifications (variant_id,spec_key,label,value_text,unit,confidence,source_url,checked_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(variant_id,spec_key) DO UPDATE SET label=excluded.label,value_text=excluded.value_text,unit=excluded.unit,confidence=excluded.confidence,source_url=excluded.source_url,checked_at=excluded.checked_at').bind(variant.id,spec.key,spec.label,spec.value,spec.unit ?? null,'sourced',spec.sourceUrl ?? source.url,spec.checkedAt)); }
+        for (const feature of entry.equipment ?? []) { equipment++; statements.push(db.prepare('INSERT INTO variant_equipment (variant_id,feature_key,category,label,value_text,note,confidence,source_url,checked_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(variant_id,feature_key) DO UPDATE SET category=excluded.category,label=excluded.label,value_text=excluded.value_text,note=excluded.note,confidence=excluded.confidence,source_url=excluded.source_url,checked_at=excluded.checked_at').bind(variant.id,feature.key,feature.category,feature.label,feature.value,feature.note ?? null,'sourced',feature.sourceUrl ?? source.url,feature.checkedAt)); }
+      }
+      statements.push(db.prepare('INSERT INTO catalog_imports (id,source_name,source_url,imported_by,records_created,records_updated,created_at) VALUES (?,?,?,?,?,?,?)').bind(importId,source.name,source.url,'operator',variants.length,prices+specs+equipment,now));
+      for (let offset=0;offset<statements.length;offset+=80) await db.batch(statements.slice(offset,offset+80));
+      return json({id:importId,variants:variants.length,prices,specifications:specs,equipment},201);
     }
     if (pathname === '/api/operator/enquiries' && method === 'GET') {
       const {results} = await db.prepare('SELECT id,title,purpose,upgrades,status,created_at,updated_at,email,city_id,dealer_id,provider_id,provider_variant_id FROM enquiries ORDER BY created_at DESC LIMIT 100').all();
