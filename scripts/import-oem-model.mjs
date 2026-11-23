@@ -7,6 +7,7 @@ const models={
   'alto-k10':{brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'Alto K10',modelId:'maruti-suzuki-alto-k10',bodyType:'hatchback'},
   's-presso':{providerId:'spresso',brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'S-Presso',modelId:'maruti-suzuki-s-presso',bodyType:'hatchback'},
   swift:{brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'Swift',modelId:'maruti-suzuki-swift',bodyType:'hatchback'},
+  brezza:{brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'Brezza',modelId:'maruti-suzuki-brezza',bodyType:'compact-suv'},
 };
 const model=models[modelKey];
 if (!model) throw new Error('Usage: node scripts/import-oem-model.mjs <'+Object.keys(models).join('|')+'>');
