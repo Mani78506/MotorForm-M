@@ -258,7 +258,7 @@ async function marketplaceCatalog(db, cityId) {
   await ensureMarketplace(db);
   const city=cityFor(cityId);
   const {results}=await db.prepare(`SELECT v.id, b.name AS brand, m.name AS model, v.name AS trim, m.body_type AS body, v.fuel, v.gearbox, v.ex_showroom AS base, v.uses_json, v.factory_features_json, v.optional_features_json, cp.on_road, cp.registration, cp.insurance, cp.confidence, cp.checked_at, p.name AS source
-    FROM variants v JOIN models m ON m.id=v.model_id JOIN brands b ON b.id=m.brand_id JOIN city_prices cp ON cp.variant_id=v.id AND cp.city_id=? LEFT JOIN providers p ON p.id=cp.provider_id WHERE v.active=1 ORDER BY b.name,m.name,v.ex_showroom`).bind(city.id).all();
+    FROM variants v JOIN models m ON m.id=v.model_id JOIN brands b ON b.id=m.brand_id JOIN city_prices cp ON cp.variant_id=v.id AND cp.city_id=? LEFT JOIN providers p ON p.id=cp.provider_id WHERE v.active=1 AND (v.id NOT LIKE 'oem-%' OR EXISTS (SELECT 1 FROM catalog_curation_targets target WHERE target.brand_name=b.name AND target.model_name=m.name AND target.stage='published')) ORDER BY b.name,m.name,v.ex_showroom`).bind(city.id).all();
   if (!results.length) return null;
   return {cars:results.map(row=>({id:row.id,model:row.brand+' '+row.model,trim:row.trim,body:row.body,fuel:row.fuel,gearbox:row.gearbox,base:row.base,costs:row.on_road-row.base,uses:JSON.parse(row.uses_json),factory:JSON.parse(row.factory_features_json),options:JSON.parse(row.optional_features_json),source:row.source,priceDate:row.checked_at.slice(0,10),confidence:row.confidence})),features:seed.features,illustrative:true,city,cities,estimateProvider:'MotorForm internal estimated pricing'};
 }
