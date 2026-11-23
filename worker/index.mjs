@@ -447,6 +447,32 @@ async function api(request, env, url, visitor, native) {
   if (pathname === '/api/cities' && method === 'GET') return json(cities);
   if (pathname === '/api/catalog' && method === 'GET') return json(await catalog(db,searchParams.get('city') ?? undefined));
   if (pathname === '/api/matches' && method === 'GET') return json(matchCars(await catalog(db,searchParams.get('city') ?? undefined),searchParams));
+  if (pathname === '/api/comparison-cart') {
+    if (method === 'GET') {
+      const {results}=await db.prepare('SELECT payload_json FROM comparison_cart_items WHERE visitor=? ORDER BY updated_at ASC LIMIT 3').bind(visitor).all();
+      return json(results.map(row=>JSON.parse(row.payload_json)));
+    }
+    if (method === 'PUT') {
+      const input=await body(request); const vehicle=input?.vehicle;
+      if (!vehicle || input.provider!=='lets-pick-my-car' || typeof vehicle.id!=='string' || !vehicle.id.startsWith('pmc:') || !validId(vehicle.modelId) || !validId(vehicle.providerVariantId) || !clean(vehicle.name,180) || !amount(vehicle.onRoad) || !clean(vehicle.fuel,40) || !clean(vehicle.gearbox,40)) return json({error:'Choose a valid live variant to compare.'},400);
+      const payload=JSON.stringify(vehicle); if (payload.length>20_000) return json({error:'Vehicle payload is too large.'},400);
+      const now=new Date().toISOString();
+      const result=await db.prepare(`INSERT INTO comparison_cart_items (visitor,vehicle_id,provider_id,payload_json,created_at,updated_at)
+        SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM comparison_cart_items WHERE visitor=? AND provider_id='lets-pick-my-car')<3
+        OR EXISTS(SELECT 1 FROM comparison_cart_items WHERE visitor=? AND vehicle_id=? AND provider_id='lets-pick-my-car')
+        ON CONFLICT(visitor,vehicle_id,provider_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+        .bind(visitor,vehicle.id,'lets-pick-my-car',payload,now,now,visitor,visitor,vehicle.id).run();
+      if (!result.meta.changes) return json({error:'Compare up to three variants at a time.'},409);
+      await recordInteraction(db,visitor,vehicle.id,'compared');
+      return json({ok:true},201);
+    }
+    if (method === 'DELETE') {
+      const input=await body(request);
+      if (!input || typeof input.vehicleId!=='string' || !input.vehicleId.startsWith('pmc:')) return json({error:'Choose a valid comparison item.'},400);
+      await db.prepare('DELETE FROM comparison_cart_items WHERE visitor=? AND vehicle_id=? AND provider_id=?').bind(visitor,input.vehicleId,'lets-pick-my-car').run();
+      return json({ok:true});
+    }
+  }
   if (pathname === '/api/saved-vehicles') {
     if (method === 'GET') {
       const {results}=await db.prepare('SELECT payload_json FROM saved_vehicles WHERE visitor=? ORDER BY updated_at DESC LIMIT 100').bind(visitor).all();
@@ -499,13 +525,16 @@ async function api(request, env, url, visitor, native) {
         typeof input.email !== 'string' || input.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) return json({error:'Choose a valid variant, purpose and email.'},400);
       const id = crypto.randomUUID();
       const createdAt=new Date().toISOString();
-      await db.prepare(`INSERT INTO enquiries (id,visitor,variant,title,purpose,upgrades,created_at,email,city_id,updated_at,provider_id,provider_variant_id)
-        SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM enquiries WHERE visitor=?) < 30`)
-        .bind(id,visitor,car.id,(car.model+' '+car.trim).trim(),input.purpose,JSON.stringify([...new Set(input.upgrades)]),createdAt,input.email,city.id,createdAt,external?'lets-pick-my-car':null,external?input.providerVariantId:null,visitor)
+      const dealer=await db.prepare(`SELECT id,name,typical_response_hours FROM dealers WHERE city_id=? AND active=1
+        ORDER BY CASE response_quality WHEN 'responsive' THEN 0 WHEN 'unrated' THEN 1 ELSE 2 END, COALESCE(typical_response_hours,999999), created_at ASC LIMIT 1`).bind(city.id).first();
+      await db.prepare(`INSERT INTO enquiries (id,visitor,variant,title,purpose,upgrades,created_at,email,city_id,updated_at,provider_id,provider_variant_id,dealer_id)
+        SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM enquiries WHERE visitor=?) < 30`)
+        .bind(id,visitor,car.id,(car.model+' '+car.trim).trim(),input.purpose,JSON.stringify([...new Set(input.upgrades)]),createdAt,input.email,city.id,createdAt,external?'lets-pick-my-car':null,external?input.providerVariantId:null,dealer?.id ?? null,visitor)
         .run().then(result => { if (!result.meta.changes) throw new RangeError('Limit'); });
       await db.prepare('INSERT INTO enquiry_events (id,enquiry_id,to_status,actor,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,'received','buyer',createdAt).run();
+      if (dealer) await db.prepare('INSERT INTO enquiry_events (id,enquiry_id,to_status,actor,note,created_at) VALUES (?,?,?,?,?,?)').bind(crypto.randomUUID(),id,'assigned','routing','Matched to an eligible city dealer',createdAt).run();
       await recordInteraction(db,visitor,input.variant,'enquired');
-      return json({id,status:'received'},201);
+      return json({id,status:'received',routing:dealer?{status:'assigned',dealerName:dealer.name,typicalResponseHours:dealer.typical_response_hours ?? null}:{status:'queued'}},201);
     }
   }
   if (pathname === '/api/owner-requests' && method === 'POST') {

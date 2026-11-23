@@ -18,6 +18,7 @@ export type ProviderComparison={source:'india_provider';items:ProviderComparison
 export type DecisionConfidence={dealerAvailability:{active:number;responsive:number;fastestResponseHours:number|null;label:string};buyerSignals:{saved:number;compared:number;enquired:number;disclaimer:string};reviews:{status:string;label:string}};
 export type PreownedAssessment={allInCost:{askingPrice:number;transfer:number;inspection:number;immediateRepairs:number;plannedUpgrades:number;total:number;disclaimer:string};evidence:{verified:string[];missing:string[];failed:string[]};riskLevel:'Lower'|'Medium'|'High';worthInspecting:boolean;decision:string;nextChecks:string[]};
 export type OwnerRequest={id:string;status:string};
+export type EnquiryReceipt={id:string;status:string;routing?:{status:'assigned';dealerName:string;typicalResponseHours:number|null}|{status:'queued'}};
 export type RecommendationResponse = {source:'india_provider'|'internal_estimate';city:City;items:Recommendation[];decisionPaths?:{bestValue?:string;bestComfort?:string;safeAlternative?:string};attribution:{name:string;url:string|null};datasetRevision?:string|null};
 
 // Every build must use the live nationwide Worker. EXPO_PUBLIC_API_BASE remains
@@ -103,6 +104,9 @@ export function getRecommendations(input:{budget:number;use:string;features:stri
 export const getSavedProviderVehicles = () => request<Recommendation[]>('saved-vehicles');
 export const saveProviderVehicle = (vehicle:Recommendation) => request('saved-vehicles','PUT',{provider:'lets-pick-my-car',vehicle});
 export const removeProviderVehicle = (vehicleId:string) => request('saved-vehicles','DELETE',{provider:'lets-pick-my-car',vehicleId});
+export const getComparisonCart = () => request<Recommendation[]>('comparison-cart');
+export const addComparisonCart = (vehicle:Recommendation) => request('comparison-cart','PUT',{provider:'lets-pick-my-car',vehicle});
+export const removeComparisonCart = (vehicleId:string) => request('comparison-cart','DELETE',{vehicleId});
 export const getDecisionConfidence = (city:string) => request<DecisionConfidence>('decision-confidence?city='+encodeURIComponent(city));
 export const recordComparison = (vehicleId:string) => request('interactions','POST',{vehicleId,action:'compared'});
 export const getProviderComparison = (input:{city:string;variants:{carId:string;variantId:string}[]}) => request<ProviderComparison>('provider-comparisons','POST',input);
