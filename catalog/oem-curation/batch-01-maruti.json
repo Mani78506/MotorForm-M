@@ -1,0 +1,18 @@
+{
+  "batch": "01-maruti-arena-and-nexa",
+  "checkedAt": "2026-11-23",
+  "status": "source_collection",
+  "publicationRule": "All active variants and their source-stamped price and equipment records must be captured before a model can move to quality_review.",
+  "models": [
+    {"queueId":"launch-01","brand":"Maruti Suzuki","model":"Alto K10","priceUrl":"https://www.marutisuzuki.com/arena/alto-k10/price","brochureUrl":"https://www.marutisuzuki.com/content/dam/msil/arena/in/en/assets/cars/alto-k10/documents/AltoK10-KV-Brochure.pdf","status":"variant_capture"},
+    {"queueId":"launch-02","brand":"Maruti Suzuki","model":"S-Presso","priceUrl":"https://www.marutisuzuki.com/arena/s-presso/price","brochureUrl":"https://www.marutisuzuki.com/content/dam/msil/arena/in/en/assets/cars/s-presso/documents/S-presso-Brochure.pdf","status":"variant_capture"},
+    {"queueId":"launch-03","brand":"Maruti Suzuki","model":"Celerio","priceUrl":"https://www.marutisuzuki.com/arena/celerio/price","status":"source_collection"},
+    {"queueId":"launch-04","brand":"Maruti Suzuki","model":"WagonR","priceUrl":"https://www.marutisuzuki.com/arena/wagon-r/price","brochureUrl":"https://www.marutisuzuki.com/content/dam/msil/arena/in/en/assets/cars/wagonr/documents/Arena-Wagon-r-Brochure.pdf","status":"source_collection"},
+    {"queueId":"launch-05","brand":"Maruti Suzuki","model":"Swift","priceUrl":"https://www.marutisuzuki.com/arena/swift/price","status":"source_collection"},
+    {"queueId":"launch-06","brand":"Maruti Suzuki","model":"Dzire","priceUrl":"https://www.marutisuzuki.com/arena/dzire/price","brochureUrl":"https://www.marutisuzuki.com/content/dam/msil/arena/in/en/assets/cars/dzire/brochures/DZire-brochure_.pdf","status":"variant_capture"},
+    {"queueId":"launch-07","brand":"Maruti Suzuki","model":"Brezza","priceUrl":"https://www.marutisuzuki.com/arena/brezza/price","status":"source_collection"},
+    {"queueId":"launch-08","brand":"Maruti Suzuki","model":"Ertiga","priceUrl":"https://www.marutisuzuki.com/arena/ertiga/price","status":"source_collection"},
+    {"queueId":"launch-09","brand":"Maruti Suzuki","model":"Baleno","priceUrl":"https://www.nexaexperience.com/new-age-baleno/price","brochureUrl":"https://www.nexaexperience.com/content/dam/msil/nexa/in/en/assets/cars/newbaleno/download-brochure/The-Stunning-New-Baleno-Brochure.pdf","status":"variant_capture"},
+    {"queueId":"launch-10","brand":"Maruti Suzuki","model":"Fronx","priceUrl":"https://www.nexaexperience.com/fronx/price","status":"source_collection"}
+  ]
+}
