@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises';
 
 const modelKey=process.argv[2];
+const start=Math.max(0,Number.parseInt(process.argv[3] ?? '0',10) || 0);
+const count=Math.min(3,Math.max(1,Number.parseInt(process.argv[4] ?? '3',10) || 3));
 const models={
   'alto-k10':{brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'Alto K10',modelId:'maruti-suzuki-alto-k10',bodyType:'hatchback'},
-  's-presso':{brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'S-Presso',modelId:'maruti-suzuki-s-presso',bodyType:'hatchback'},
+  's-presso':{providerId:'spresso',brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'S-Presso',modelId:'maruti-suzuki-s-presso',bodyType:'hatchback'},
+  swift:{brand:'Maruti Suzuki',brandId:'maruti-suzuki',model:'Swift',modelId:'maruti-suzuki-swift',bodyType:'hatchback'},
 };
 const model=models[modelKey];
 if (!model) throw new Error('Usage: node scripts/import-oem-model.mjs <'+Object.keys(models).join('|')+'>');
@@ -12,16 +15,23 @@ if (!config.PMC_API_KEY || !config.MOTORFORM_OPERATOR_KEY) throw new Error('Requ
 const providerHeaders={Authorization:'Bearer '+config.PMC_API_KEY};
 const operatorHeaders={'Content-Type':'application/json',Authorization:'Bearer '+config.MOTORFORM_OPERATOR_KEY,'x-motorform-session':'4e514a2e-e340-45dd-b5fb-a6d6b7806437'};
 const worker='https://motorform-api.mokshith8143.workers.dev';
+const providerId=model.providerId ?? modelKey;
 const cities=[['hyderabad',1],['bengaluru',1.16],['mumbai',1.13],['delhi',.94],['pune',1.09],['chennai',1.04],['kolkata',.97],['ahmedabad',.96]];
 const clean=(value,limit)=>String(value ?? '').replace(/[\r\n\t]+/g,' ').replace(/[&<>"']/g,' ').replace(/\s+/g,' ').trim().slice(0,limit);
 const id=value=>{const valueId=clean(value,80).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,''); return /^[a-z]/.test(valueId)?valueId:'fact-'+valueId;};
-const get=async(path,key)=>{const response=await fetch('https://letspickmycar.com/api/v1/'+path,{headers:{...providerHeaders,'Idempotency-Key':key}});const payload=await response.json();if(!response.ok)throw new Error(payload?.error?.message ?? 'Provider request failed');return payload.data ?? payload;};
+const get=async(path,key)=>{for(let attempt=0;attempt<3;attempt++){const response=await fetch('https://letspickmycar.com/api/v1/'+path,{headers:{...providerHeaders,'Idempotency-Key':key}});const payload=await response.json();if(response.status===429&&attempt<2){process.stdout.write('Provider rate limit reached; retrying this request after one minute.\n');await new Promise(resolve=>setTimeout(resolve,61000));continue;}if(!response.ok)throw new Error(payload?.error?.message ?? 'Provider request failed');return payload.data ?? payload;}throw new Error('Provider rate limit did not clear.');};
 const post=async(path,payload)=>{const response=await fetch(worker+path,{method:'POST',headers:operatorHeaders,body:JSON.stringify(payload)});const body=await response.json();if(!response.ok)throw new Error([body.error,body.detail].filter(Boolean).join(' ')||'Import request failed');return body;};
-const list=await get('cars/'+modelKey+'/variants?price=ex&loc=TS','motorform-'+modelKey+'-variant-list-20261123');
+const list=await get('cars/'+providerId+'/variants?price=ex&loc=TS','motorform-'+modelKey+'-variant-list-20261123');
 const variants=list.items ?? [];
 if (!variants.length) throw new Error('No active variants returned for '+modelKey);
+const selectedVariants=variants.slice(start,start+count);
+if (!selectedVariants.length) throw new Error('Requested variant range is outside the active list.');
 const details=[];
-for (const item of variants) details.push(await get('cars/'+modelKey+'/variants/'+encodeURIComponent(item.variantId)+'?price=onroad&loc=TS','motorform-'+modelKey+'-'+item.variantId+'-detail-20261123'));
+for (const [index,item] of selectedVariants.entries()) {
+  if (index) await new Promise(resolve=>setTimeout(resolve,7000));
+  process.stdout.write('Capturing '+model.model+' '+(start+index+1)+'/'+variants.length+'\n');
+  details.push(await get('cars/'+providerId+'/variants/'+encodeURIComponent(item.variantId)+'?price=onroad&loc=TS','motorform-'+modelKey+'-'+item.variantId+'-detail-20261123'));
+}
 const sourceFor=(detail,term)=>detail.sources?.find(source=>source.kind==='manufacturer'&&source.label.toLowerCase().includes(term)) ?? detail.sources?.find(source=>source.kind==='manufacturer');
 const records=details.map(detail=>{
   const priceSource=sourceFor(detail,'price') ?? sourceFor(detail,'retail');
@@ -42,4 +52,4 @@ const payload={source:{name:'OEM manual curation',url:modelSource.url,checkedAt:
 const dryRun=await post('/api/operator/catalog/import',{...payload,dryRun:true});
 if (!dryRun.validSource || dryRun.invalidVariantIndexes.length) throw new Error('Dry run failed: '+JSON.stringify(dryRun));
 const result=await post('/api/operator/catalog/import',payload);
-console.log(JSON.stringify({model:model.model,dryRun,result}));
+console.log(JSON.stringify({model:model.model,range:{start,count,total:variants.length},dryRun,result}));
